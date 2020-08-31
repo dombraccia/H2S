@@ -1,0 +1,5 @@
+## R
+*.Rproj*
+
+# Mac
+*.DS_store*
