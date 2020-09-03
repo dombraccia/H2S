@@ -1,5 +1,7 @@
 ## R
 *.Rproj*
+*.Rhistory*
 
 # Mac
 *.DS_store*
+.Rproj.user

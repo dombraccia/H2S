@@ -15,8 +15,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Loading Libraries
 
-```{r}
-library(curatedMetagenomicData)
+```{r, message=FALSE, warning=FALSE}
+library(curatedMetagenomicData, quietly = TRUE)
 library(tictoc)
 library(dplyr)
 library(ggplot2)
@@ -26,12 +26,13 @@ library(ggplot2)
 # Loading data
 
 ```{r}
-if(file.exists("data/all_data.RDS")) {
-  all_data <- readRDS("data/all_data.RDS")
+getwd()
+if(file.exists("../data/all_data.RDS")) {
+  all_data <- readRDS("../data/all_data.RDS")
 } else {
   tic()
   all_data <- curatedMetagenomicData("*metaphlan_bugs_list.stool*", dryrun = FALSE)
-  saveRDS(all_data, file = "data/all_data.RDS")
+  saveRDS(all_data, file = "../data/all_data.RDS")
   toc()
 }
 ```
@@ -70,18 +71,58 @@ control_RA <- all_RA[, colnames(all_RA) %in% rownames(all_pData_controls)]
 ```
 
 
-# Plotting and reporting results
+# Reporting results
 
 TODO:
-[ ] - create short list of cysteine reducing bacteria to provide RA measurments for
-[ ] - run GutFunFind on known genes and then expand list of cystein reducing bacteria 
+[X] - generate prevalence of Sulfate and Sulfite Reducing Bacteria
+[ ] - run GutFunFind on known genes and then expand list of cysteine reducing bacteria 
+
+## Prevalence of sulfite reducing bacteria in healthy controls
 
 ```{r}
-## TEST: grabbing B. wadsworthia RA
-b_wad_RA <- control_RA[grep("s__Bilophila_wadsworthia$", rownames( control_RA)), ]
-
-## now on to the plotting
-ggplot(log(as.data.frame(b_wad_RA)), aes(y = b_wad_RA)) + 
-  geom_boxplot()
+# getting B. wadsworthia prevalence
+b_wad <- control_RA[grep("s__Bilophila_wadsworthia$", rownames( control_RA)), ]
+b_wad_summary <- summary(b_wad)
+b_wad_sd <- sd(b_wad)
+b_wad_prev <- sum(b_wad > 0) / length(b_wad)
 ```
 
+Across all healthy controls available in `curatedMetagenomicData` (52 datasets), the sulfite reducing bacteria Bilophila wadsworthia was detected in `r round(b_wad_prev*100, 1)`% of samples at an average relative abundance of `r b_wad_summary[4]`% (median relative abundance = `r b_wad_summary[3]`%).
+
+## Prevalence of sulfate reducing bacteria
+
+```{r}
+## getting Desulfovibrio spp: piger, desulfuricans, gigas
+d_piger <- control_RA[grep("s__Desulfovibrio_piger$", rownames(control_RA)), ]
+d_piger_summary <- summary(d_piger)
+d_piger_sd <- sd(d_piger)
+d_piger_prev <- sum(d_piger > 0) / length(d_piger)
+
+## desulfricans
+d_desulf <- control_RA[grep("s__Desulfovibrio_desulfuricans$", rownames(control_RA)), ]
+d_desulf_summary <- summary(d_desulf)
+d_desulf_sd <- sd(d_desulf)
+d_desulf_prev <- sum(d_desulf > 0) / length(d_desulf)
+
+## gigas
+d_gigas <- control_RA[grep("s__Desulfovibrio_gigas$", rownames(control_RA)), ]
+d_gigas_summary <- summary(d_gigas)
+d_gigas_sd <- sd(d_gigas)
+d_gigas_prev <- sum(d_gigas > 0) / length(d_gigas)
+
+## presence of one or more of above 4 species
+combined <- data.frame(b_wad = b_wad, 
+                       d_piger = d_piger,
+                       d_desulf = d_desulf,
+                       d_gigas = d_gigas)
+combined_rs <- rowSums(combined)
+combined_prev <- sum(combined_rs > 0) / length(combined_rs)
+```
+
+Across all healthy controls available in `curatedMetagenomicData` (52 datasets), the sulfate reducing bacteria Desulfovibrio piger was detected in `r round(d_piger_prev*100, 1)`% of samples at an average relative abundance of `r d_piger_summary[4]`% (median relative abundance = `r d_piger_summary[3]`%).
+
+Across all healthy controls available in `curatedMetagenomicData` (52 datasets), the sulfate reducing bacteria Desulfovibrio desulfuricans was detected in `r round(d_desulf_prev*100, 1)`% of samples at an average relative abundance of `r d_desulf_summary[4]`% (median relative abundance = `r d_desulf_summary[3]`%).
+
+Across all healthy controls available in `curatedMetagenomicData` (52 datasets), the sulfate reducing bacteria Desulfovibrio gigas was detected in `r round(d_gigas_prev*100, 1)`% of samples at an average relative abundance of `r d_gigas_summary[4]`% (median relative abundance = `r d_gigas_summary[3]`%).
+
+Across all healthy controls available in `curatedMetagenomicData` (52 datasets), the presence of one or more of the sulfate / sulfite reducing bacteria were detected in `r round(combined_prev*100, 1)`% of samples.
