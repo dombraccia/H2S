@@ -12,12 +12,15 @@ knitr::opts_chunk$set(echo = TRUE)
 # Overview
 
 TODOs:
-[X] - generate prevalence of Sulfate and Sulfite Reducing Bacteria
-[ ] - report above prevalence better.. in a table or something
+* [X] - generate prevalence of Sulfate and Sulfite Reducing Bacteria
+* [ ] - report above prevalence better.. in a table or something
 
-[X] - run GutFunFind on known genes and then expand list of cysteine reducing bacteria 
-[X] - import list of cysteine degrading bacteria to this script
-[X] - run same set of analyses on these names as the sulfate / sulfite reducing bac.
+* [X] - run GutFunFind on known genes and then expand list of cysteine reducing bacteria 
+* [X] - import list of cysteine degrading bacteria to this script
+* [X] - run same set of analyses on these names as the sulfate / sulfite reducing bac.
+
+* [ ] - make boxplots for RA of sulfi(a)te red. bac. and RA of cys. deg. bac.
+
 
 # Loading Libraries
 
@@ -32,7 +35,6 @@ library(ggplot2)
 # Loading data
 
 ```{r}
-getwd()
 if(file.exists("../data/all_data.RDS")) {
   all_data <- readRDS("../data/all_data.RDS")
 } else {
@@ -110,12 +112,12 @@ d_gigas_sd <- sd(d_gigas)
 d_gigas_prev <- sum(d_gigas > 0) / length(d_gigas)
 
 ## presence of one or more of above 4 species
-combined <- data.frame(b_wad = b_wad, 
+sulf_red_RA <- data.frame(b_wad = b_wad, 
                        d_piger = d_piger,
                        d_desulf = d_desulf,
                        d_gigas = d_gigas)
-combined_rs <- rowSums(combined)
-combined_prev <- sum(combined_rs > 0) / length(combined_rs)
+sulf_red_RA_rs <- rowSums(sulf_red_RA)
+sulf_red_RA_prev <- sum(sulf_red_RA_rs > 0) / length(sulf_red_RA_rs)
 ```
 
 Across all healthy controls available in `curatedMetagenomicData` (52 datasets), the sulfate reducing bacteria Desulfovibrio piger was detected in `r round(d_piger_prev*100, 1)`% of samples at an average relative abundance of `r d_piger_summary[4]`% (median relative abundance = `r d_piger_summary[3]`%).
@@ -124,7 +126,7 @@ Across all healthy controls available in `curatedMetagenomicData` (52 datasets),
 
 Across all healthy controls available in `curatedMetagenomicData` (52 datasets), the sulfate reducing bacteria Desulfovibrio gigas was detected in `r round(d_gigas_prev*100, 1)`% of samples at an average relative abundance of `r d_gigas_summary[4]`% (median relative abundance = `r d_gigas_summary[3]`%).
 
-Across all healthy controls available in `curatedMetagenomicData` (52 datasets), the presence of one or more of the sulfate / sulfite reducing bacteria were detected in `r round(combined_prev*100, 1)`% of samples.
+Across all healthy controls available in `curatedMetagenomicData` (52 datasets), the presence of one or more of the sulfate / sulfite reducing bacteria were detected in `r round(sulf_red_RA_prev*100, 1)`% of samples.
 
 # Prevalence of Cysteine Degrading Bacteria
 
@@ -132,7 +134,7 @@ Across all healthy controls available in `curatedMetagenomicData` (52 datasets),
 
 ## Importing results from GutFunFind
 
-Before reporting results similar to the sulfite and sulfate reducing bacteria for cysteine degrading bacteria, I used GutFunFind to query known cysteine degrading enzymes against the 4,644 representative UHGG genomes. Of these representative genomes, 493 generated a hit for 1 or more cysteine degrading enzyme. This generated a list of taxa containing likely homologues of these known enzymes. This taxonomic data has been imported from GutFunFind and is located in `results/from-GutFunFind/taxa_hits.txt`.
+Before reporting results similar to the sulfite and sulfate reducing bacteria for cysteine degrading bacteria, I used GutFunFind to query known cysteine degrading enzymes against the 4,644 representative UHGG genomes. Of these representative genomes, 252 generated a hit for 1 or more cysteine degrading enzyme. This generated a list of taxa containing likely homologues of these known enzymes. This taxonomic data has been imported from GutFunFind and is located in `results/from-GutFunFind/taxa_hits.txt`.
 
 ```{r}
 taxa_hits <- read.csv("../results/from-GutFunFind/taxa_hits.txt", sep = "\t", header = FALSE)
@@ -147,16 +149,33 @@ for (i in 1:length(taxa_hits)) {
 }
 
 # removing empty species names
+taxa_hits_spp
 length(taxa_hits_spp)
 taxa_hits_spp <- taxa_hits_spp[taxa_hits_spp != ""]
+taxa_hits_spp
 length(taxa_hits_spp)
 
 # removing Co-Abundance gene Groups (CAGs), GCAs (?), etc.
-taxa_hits_spp <- taxa_hits_spp[-grep("CAG", taxa_hits_spp)]
+if (length(grep("CAG", taxa_hits_spp)) == 0) {
+  # do nothing
+} else if (length(grep("CAG", taxa_hits_spp)) > 0) {
+  taxa_hits_spp <- taxa_hits_spp[-grep("CAG", taxa_hits_spp)]
+}
+taxa_hits_spp
 length(taxa_hits_spp)
-taxa_hits_spp <- taxa_hits_spp[-grep("GCA", taxa_hits_spp)]
+if (length(grep("GCA", taxa_hits_spp)) == 0) {
+  # do nothing
+} else if (length(grep("GCA", taxa_hits_spp)) > 0) {
+  taxa_hits_spp <- taxa_hits_spp[-grep("GCA", taxa_hits_spp)]
+}
+taxa_hits_spp
 length(taxa_hits_spp)
-taxa_hits_spp <- taxa_hits_spp[-grep("sp[0-9]*", taxa_hits_spp)]
+if (length(grep("sp[0-9]*", taxa_hits_spp)) == 0) {
+  # do nothing
+} else if (length(grep("sp[0-9]*", taxa_hits_spp)) > 0) {
+  taxa_hits_spp <- taxa_hits_spp[-grep("sp[0-9]*", taxa_hits_spp)]
+}
+taxa_hits_spp
 length(taxa_hits_spp)
 
 # removing oddities from names like "_A", "_X", etc.
@@ -169,6 +188,7 @@ length(taxa_hits_spp)
 
 # removing duplicates of species names
 taxa_hits_spp <- unique(taxa_hits_spp)
+length(taxa_hits_spp)
 ```
 
 The above code takes an initial 493 taxa hits from `GutFunFind` and filters out names without species level resolition. A number of other modifications were also made to make the taxonomic name searchable against the identifiers present in `curatedMetagenomicData`. The variable `taxa_hits_spp` contains a final list of 254 Genus_species names with cysteine degrading potential.
@@ -181,18 +201,45 @@ for (i in 1:length(taxa_hits_spp)) {
   indicies[[i]] <- grep(taxa_hits_spp[i], rownames(control_RA))
 }
 indicies <- unlist(indicies)
-length(indicies)
 indicies <- unique(indicies) # sanity check, no repeat rows
-length(indicies)
 
 # subsetting rel. abund. of cysteine deg bacteria
-cys_deg_RA <- control_RA[indicies, ] 
-dim(control_RA)
+cys_deg_RA <- control_RA[indicies, ]
+dim(cys_deg_RA)
+
+# removing rows with __t in the taxa name... leading to double counting of RA
+cys_deg_RA <- cys_deg_RA[-grep("t__", rownames(cys_deg_RA)), ]
 dim(cys_deg_RA)
 
 # computing colSums and calculating XX% prevalance of cys. deg. bac.
 cys_deg_cs <- colSums(cys_deg_RA)
 sum(cys_deg_cs > 0) / length(cys_deg_cs)
+```
+
+# Comparing abundance of Sulfi(a)te red. bac. and cys. deg. bac.
+
+```{r}
+# prepping data for plotting
+sulf_red_RA <- t(sulf_red_RA)
+sulf_red_cs <- colSums(sulf_red_RA)
+sulf_red_summary <- summary(sulf_red_cs)
+sulf_red_summary
+cys_deg_summary <- summary(cys_deg_cs)
+cys_deg_summary
+
+df <- data.frame(sulf_red = sulf_red_cs,
+                 cys_deg = cys_deg_cs)
+
+# plotting abundances of sulf(ai)te red bac and cys deg bac
+ggplot(stack(df), aes(x = ind, y = values)) +
+  geom_boxplot(outlier.alpha = 0.12) + 
+  stat_summary(fun.y = mean, geom = "point", shape = 4, size = 4) +
+  scale_y_continuous(breaks = seq(0, 100, by = 10)) + 
+  # geom_hline(yintercept = median(df$cys_deg), color = "red", linetype = "dashed") +
+  ggtitle("Comparing relative abundances of two H2S producing pathways") +
+  xlab("type of H2S producing bacteria") + ylab("Relative Abundance (%)") + 
+  theme_linedraw()
+ggsave("../figures/sulfRed_vs_cysDeg_abundances.png")
 ```
 
 
