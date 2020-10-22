@@ -246,13 +246,13 @@ ggsave("../figures/sulfRed_vs_cysDeg_abundances.png")
 
 ```{r}
 ## load in pie chart file
-tmp <- read.table("../results/from-GutFunFind/H2S_production.pichart.txt", skip = 7)
-rownames(tmp) <- tmp$V1
-tmp %>%
-  select(V4, V5, V6, V7) -> tmp
-colnames(tmp) <- c("both", "absent", "methionine", "cysteine")
-set1 <- tmp %>% filter(methionine > 0) %>% rownames()
-set2 <- tmp %>% filter(cysteine > 0) %>% rownames()
+cys_met_overlap <- read.table("../results/from-GutFunFind/H2S_production.pichart.txt", skip = 7)
+rownames(cys_met_overlap) <- cys_met_overlap$V1
+cys_met_overlap %>%
+  select(V4, V5, V6, V7) -> cys_met_overlap
+colnames(cys_met_overlap) <- c("both", "absent", "methionine", "cysteine")
+set1 <- cys_met_overlap %>% filter(methionine > 0) %>% rownames()
+set2 <- cys_met_overlap %>% filter(cysteine > 0) %>% rownames()
 # set3 <- tmp %>% filter(both > 0) %>% rownames()
 
 ## venn diagram showing overlap between cys and met degrading functionality
@@ -281,8 +281,7 @@ venn.diagram(
 
 ```{r}
 ## comparison of cys / met degrading bac using upsetR
-library(upsetR)
-
+library(UpSetR)
 
 ```
 
