@@ -242,4 +242,47 @@ ggplot(stack(df), aes(x = ind, y = values)) +
 ggsave("../figures/sulfRed_vs_cysDeg_abundances.png")
 ```
 
+### Comparison of cysteine degrading and methionine degrading bacteria
+
+```{r}
+## load in pie chart file
+tmp <- read.table("../results/from-GutFunFind/H2S_production.pichart.txt", skip = 7)
+rownames(tmp) <- tmp$V1
+tmp %>%
+  select(V4, V5, V6, V7) -> tmp
+colnames(tmp) <- c("both", "absent", "methionine", "cysteine")
+set1 <- tmp %>% filter(methionine > 0) %>% rownames()
+set2 <- tmp %>% filter(cysteine > 0) %>% rownames()
+# set3 <- tmp %>% filter(both > 0) %>% rownames()
+
+## venn diagram showing overlap between cys and met degrading functionality
+venn.diagram(
+  x = list(set1, set2),
+  category.names = c("methionine" , "cysteine"),
+  filename = "../figures/cys_met_overlap.png",
+  output = TRUE,
+          imagetype="png" ,
+          height = 480,
+          width = 480,
+          resolution = 300,
+          lwd = 1,
+          col = c("blue", "red"),
+          fill = c(alpha("blue",0.3), alpha('red',0.3)),
+          cex = 0.5,
+          fontfamily = "sans",
+          cat.cex = 0.3,
+          cat.default.pos = "outer",
+          cat.pos = c(-27, 27),
+          cat.dist = c(0.055, 0.055),
+          cat.fontfamily = "sans",
+          cat.col = c("blue", "red"),
+)
+```
+
+```{r}
+## comparison of cys / met degrading bac using upsetR
+library(upsetR)
+
+
+```
 
