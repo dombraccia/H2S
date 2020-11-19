@@ -13,13 +13,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 TODOs:
 * [X] - generate prevalence of Sulfate and Sulfite Reducing Bacteria
-* [ ] - report above prevalence better.. in a table or something
 
 * [X] - run GutFunFind on known genes and then expand list of cysteine reducing bacteria 
 * [X] - import list of cysteine degrading bacteria to this script
 * [X] - run same set of analyses on these names as the sulfate / sulfite reducing bac.
 
-* [ ] - make boxplots for RA of sulfi(a)te red. bac. and RA of cys. deg. bac.
+* [X] - make boxplots for RA of sulfi(a)te red. bac. and RA of cys. deg. bac.
 
 
 # Loading Libraries
@@ -29,6 +28,13 @@ library(curatedMetagenomicData, quietly = TRUE)
 library(tictoc)
 library(dplyr)
 library(ggplot2)
+library(VennDiagram)
+library(UpSetR)
+library(patchwork)
+library(cowplot)
+library(svglite)
+library(scales)
+library(reshape)
 ```
 
 
@@ -43,6 +49,10 @@ if(file.exists("../data/all_data.RDS")) {
   saveRDS(all_data, file = "../data/all_data.RDS")
   toc()
 }
+
+## loading kraken2 data from Xiaofang
+kraken2_counts <- readRDS("../data/from-xiaofang/kraken2_output.rds")
+kraken2_pData <- readRDS("../data/from-xiaofang/metadata.rds")
 ```
 
 # Exploring data
@@ -50,15 +60,9 @@ if(file.exists("../data/all_data.RDS")) {
 ```{r}
 ## merging all datasets
 all_data_merged <- mergeData(all_data)
-
 all_pData <- pData(all_data_merged)
-disease_type <- all_pData %>% 
-  select("study_condition", "disease", "disease_subtype", "disease_stage")
-sum(is.na(all_pData$disease))
-sum(all_pData$disease == "healthy")
 study_cond <- all_pData$study_condition
 study_cond_NA <- all_data_merged[,is.na(all_pData$study_condition) ]
-
 ```
 
 # Processing and subsetting data
@@ -76,212 +80,662 @@ all_RA <- all_RA[, !is.na(all_pData$study_condition)]
 
 ## subsetting RA down to just present in control samples
 control_RA <- all_RA[, colnames(all_RA) %in% rownames(all_pData_controls)]
+
+# =============================== KRAKEN DATA =============================== #
+
+## computing RA values from count info
+kraken2_counts_spp <- kraken2_counts[grep("s__", rownames(kraken2_counts)), ]
+kraken2_counts_spp
+kraken2_RA <- prop.table(kraken2_counts_spp, 2)
+
+## getting rid of RA data whose sample has study_condition == NA
+study_cond_NA <- kraken2_pData %>% filter(is.na(study_condition)) %>% rownames()
+kraken2_RA <- select(as.data.frame(kraken2_RA), -study_cond_NA)
+kraken2_pData <- filter(kraken2_pData, !is.na(study_condition))
+kraken2_pData %>% 
+  filter(study_condition == "control") -> kraken2_pData_controls
+kraken2_RA_controls <- kraken2_RA[, colnames(kraken2_RA) %in% rownames(kraken2_pData_controls)]
 ```
 
-# Prevalence of sulfite reducing bacteria in healthy controls
 
-```{r}
-# getting B. wadsworthia prevalence
-b_wad <- control_RA[grep("s__Bilophila_wadsworthia$", rownames( control_RA)), ]
-b_wad_summary <- summary(b_wad)
-b_wad_sd <- sd(b_wad)
-b_wad_prev <- sum(b_wad > 0) / length(b_wad)
-```
-
-Across all healthy controls available in `curatedMetagenomicData` (52 datasets), the sulfite reducing bacteria Bilophila wadsworthia was detected in `r round(b_wad_prev*100, 1)`% of samples at an average relative abundance of `r b_wad_summary[4]`% (median relative abundance = `r b_wad_summary[3]`%).
-
-# Prevalence of sulfate reducing bacteria
-
-```{r}
-## getting Desulfovibrio spp: piger, desulfuricans, gigas
-d_piger <- control_RA[grep("s__Desulfovibrio_piger$", rownames(control_RA)), ]
-d_piger_summary <- summary(d_piger)
-d_piger_sd <- sd(d_piger)
-d_piger_prev <- sum(d_piger > 0) / length(d_piger)
-
-## desulfricans
-d_desulf <- control_RA[grep("s__Desulfovibrio_desulfuricans$", rownames(control_RA)), ]
-d_desulf_summary <- summary(d_desulf)
-d_desulf_sd <- sd(d_desulf)
-d_desulf_prev <- sum(d_desulf > 0) / length(d_desulf)
-
-## gigas
-d_gigas <- control_RA[grep("s__Desulfovibrio_gigas$", rownames(control_RA)), ]
-d_gigas_summary <- summary(d_gigas)
-d_gigas_sd <- sd(d_gigas)
-d_gigas_prev <- sum(d_gigas > 0) / length(d_gigas)
-
-## presence of one or more of above 4 species
-sulf_red_RA <- data.frame(b_wad = b_wad, 
-                       d_piger = d_piger,
-                       d_desulf = d_desulf,
-                       d_gigas = d_gigas)
-sulf_red_RA_rs <- rowSums(sulf_red_RA)
-sulf_red_RA_prev <- sum(sulf_red_RA_rs > 0) / length(sulf_red_RA_rs)
-```
-
-Across all healthy controls available in `curatedMetagenomicData` (52 datasets), the sulfate reducing bacteria Desulfovibrio piger was detected in `r round(d_piger_prev*100, 1)`% of samples at an average relative abundance of `r d_piger_summary[4]`% (median relative abundance = `r d_piger_summary[3]`%).
-
-Across all healthy controls available in `curatedMetagenomicData` (52 datasets), the sulfate reducing bacteria Desulfovibrio desulfuricans was detected in `r round(d_desulf_prev*100, 1)`% of samples at an average relative abundance of `r d_desulf_summary[4]`% (median relative abundance = `r d_desulf_summary[3]`%).
-
-Across all healthy controls available in `curatedMetagenomicData` (52 datasets), the sulfate reducing bacteria Desulfovibrio gigas was detected in `r round(d_gigas_prev*100, 1)`% of samples at an average relative abundance of `r d_gigas_summary[4]`% (median relative abundance = `r d_gigas_summary[3]`%).
-
-Across all healthy controls available in `curatedMetagenomicData` (52 datasets), the presence of one or more of the sulfate / sulfite reducing bacteria were detected in `r round(sulf_red_RA_prev*100, 1)`% of samples.
-
-# Prevalence of Cysteine Degrading Bacteria
-
-[]
+# Prevalence of sulf reducing bacteria
 
 ## Importing results from GutFunFind
 
-Before reporting results similar to the sulfite and sulfate reducing bacteria for cysteine degrading bacteria, I used GutFunFind to query known cysteine degrading enzymes against the 4,644 representative UHGG genomes. Of these representative genomes, 252 generated a hit for 1 or more cysteine degrading enzyme. This generated a list of taxa containing likely homologues of these known enzymes. This taxonomic data has been imported from GutFunFind and is located in `results/from-GutFunFind/taxa_hits.txt`.
-
 ```{r}
-taxa_hits <- read.csv("../results/from-GutFunFind/taxa_hits.txt", sep = "\t", header = FALSE)
-taxa_hits <- as.vector(t(taxa_hits), mode = "character") # df -> vector
-taxa_hits <- strsplit(taxa_hits, ";")
+## comparison of cys / met degrading bac using upsetR
+cys_met_feature <- read.table("../results/from-GutFunFind/Cysteine_and_Methionine_Degradation.feature.tsv")
+colnames(cys_met_feature) <- c("genome", "func")
+cys_met_feature %>% 
+  mutate(absent = ifelse(func == "absent", 1, 0),
+         methionine = ifelse((func == "methionine" | func == "both"), 1, 0),
+         cysteine = ifelse((func == "cysteine" | func == "both"), 1, 0)) %>%
+  select(genome, absent, methionine, cysteine) -> cys_met_overlap
 
-# extracting species names from taxa hits
-taxa_hits_spp <- vector(mode = "character", length = length(taxa_hits)) # create empty caracter vector
-for (i in 1:length(taxa_hits)) {
-  current_spp <- gsub(pattern = "s__", replacement = "", taxa_hits[[i]][7])
-  taxa_hits_spp[i] <- current_spp
+# adding diss sulf red bacteria to the mix
+dsr_feature <- read.table("../results/from-GutFunFind/Dissimilatory_Sulf_Reduction.feature.tsv")
+colnames(dsr_feature) <- c("genome", "func")
+dsr_feature %>% 
+  mutate(absent = ifelse(func == "absent", 1, 0),
+         dsrA = ifelse((func == "dsrA" | func == "dsrAB"), 1, 0),
+         dsrB = ifelse((func == "dsrB" | func == "dsrAB"), 1, 0),
+         dsrAB = ifelse(func == "dsrAB", 1, 0)) %>%
+  select(genome, absent, dsrA, dsrB, dsrAB) -> dsr_overlap
+
+## TODO: combine "absent" columns from both cys met deg and diss sulf red
+cm_dsr_overlap <- cbind(cys_met_overlap, dsrAB = dsr_overlap$dsrAB) 
+for (i in 1:dim(cm_dsr_overlap)[1]) {
+  if (cm_dsr_overlap$dsrAB[i] == 1) {
+    # print(cm_dsr_overlap[i, ])
+    cm_dsr_overlap$absent[i] <- 0
+  }
 }
 
-# removing empty species names
-taxa_hits_spp
-length(taxa_hits_spp)
-taxa_hits_spp <- taxa_hits_spp[taxa_hits_spp != ""]
-taxa_hits_spp
-length(taxa_hits_spp)
+# NOTE: atm, only way to save this image is to knit the document, then "save image as"
+upset(cm_dsr_overlap, 
+      sets = c("methionine", "cysteine", "dsrAB"), 
+      order.by = "freq", decreasing = TRUE, 
+      matrix.color = c("grey23"), point.size = 5,
+      sets.bar.color = c("blue", "red", "orange"),
+      text.scale = 1.4,
+      mainbar.y.label = "Number of species with function") 
 
-# removing Co-Abundance gene Groups (CAGs), GCAs (?), etc.
-if (length(grep("CAG", taxa_hits_spp)) == 0) {
-  # do nothing
-} else if (length(grep("CAG", taxa_hits_spp)) > 0) {
-  taxa_hits_spp <- taxa_hits_spp[-grep("CAG", taxa_hits_spp)]
-}
-taxa_hits_spp
-length(taxa_hits_spp)
-if (length(grep("GCA", taxa_hits_spp)) == 0) {
-  # do nothing
-} else if (length(grep("GCA", taxa_hits_spp)) > 0) {
-  taxa_hits_spp <- taxa_hits_spp[-grep("GCA", taxa_hits_spp)]
-}
-taxa_hits_spp
-length(taxa_hits_spp)
-if (length(grep("sp[0-9]*", taxa_hits_spp)) == 0) {
-  # do nothing
-} else if (length(grep("sp[0-9]*", taxa_hits_spp)) > 0) {
-  taxa_hits_spp <- taxa_hits_spp[-grep("sp[0-9]*", taxa_hits_spp)]
-}
-taxa_hits_spp
-length(taxa_hits_spp)
-
-# removing oddities from names like "_A", "_X", etc.
-for (i in 1:length(taxa_hits_spp)) {
-  current_name <- gsub("_.", "", taxa_hits_spp[i])
-  current_name <- gsub(" ", "_", current_name)
-  taxa_hits_spp[i] <- current_name
-}
-length(taxa_hits_spp)
-
-# removing duplicates of species names
-taxa_hits_spp <- unique(taxa_hits_spp)
-length(taxa_hits_spp)
 ```
 
-The above code takes an initial 493 taxa hits from `GutFunFind` and filters out names without species level resolition. A number of other modifications were also made to make the taxonomic name searchable against the identifiers present in `curatedMetagenomicData`. The variable `taxa_hits_spp` contains a final list of 254 Genus_species names with cysteine degrading potential.
+# Prevalence of H2S Producing Bacteria
 
-## Prevalance of cysteine degrading bacteria in healthy controls
+## Importing results from GutFunFind
+
+Before reporting results similar to the sulfite and sulfate reducing bacteria for cysteine degrading bacteria, I used GutFunFind to query known cysteine degrading enzymes against the 4,644 representative UHGG genomes. 
+
+Initially, I was going through an arduous process of parsing these taxonomic hits and trying to match these hits up to the same format that the metaphlan2 RA taxa names are from `cMD`. Since then, Xiaofang has gone through the trouble of running kraken2 on the `cMD` datasets so that these lineages match up with the relative abundance data. 
+
+**IMPORTANT** I have now separated the processing done to match taxa hits with metaphlan RA data. The processing required to match taxa hits with kraken2 RA data is minimal to non existent, so that is now placed in a separate chunk.
+
+This taxonomic data has been imported from GutFunFind and is located in `results/from-GutFunFind/{function_name}.taxa_hits.txt`.
 
 ```{r}
-indicies <- list(mode = "integer")
-for (i in 1:length(taxa_hits_spp)) {
-  indicies[[i]] <- grep(taxa_hits_spp[i], rownames(control_RA))
-}
-indicies <- unlist(indicies)
-indicies <- unique(indicies) # sanity check, no repeat rows
-
-# subsetting rel. abund. of cysteine deg bacteria
-cys_deg_RA <- control_RA[indicies, ]
-dim(cys_deg_RA)
-
-# removing rows with __t in the taxa name... leading to double counting of RA
-cys_deg_RA <- cys_deg_RA[-grep("t__", rownames(cys_deg_RA)), ]
-dim(cys_deg_RA)
-
-# computing colSums and calculating XX% prevalance of cys. deg. bac.
-cys_deg_cs <- colSums(cys_deg_RA)
-sum(cys_deg_cs > 0) / length(cys_deg_cs)
+## importing taxa hit information and feature information
+dsr_taxa_hits_raw <- read.csv("../results/from-GutFunFind/Dissimilatory_Sulf_Reduction.taxa_hits.txt", sep = "\t", header = FALSE)
+cys_met_taxa_hits_raw <- read.csv("../results/from-GutFunFind/Cysteine_and_Methionine_Degradation.taxa_hits.txt", sep = "\t", header = FALSE)
+uhgg_genid2taxa <- read.csv("../data/from-xiaofang/spec.txt", sep = '\t', header = FALSE)
+uhgg_genid2taxa$V2 <- gsub(";", "|", uhgg_genid2taxa$V2)
 ```
 
-# Comparing abundance of Sulfi(a)te red. bac. and cys. deg. bac.
+## Using kraken2 output as relative abundance data
+
+Here, I am starting from raw taxa hit information from GutFunFind and seeing how little parsing I need to do to match up taxa hits with the relative abundance matrix. Above, the taxa hit names required a lot of processing in order to match hit names with relative abundance info from metaphlan, but apparently I will not have to do as much with these RA data.
+
+```{r}
+## converting imported df -> vector
+dsr_taxa_hits <- as.vector(t(dsr_taxa_hits_raw), mode = "character") 
+dsr_taxa_hits <- gsub(";", "|", dsr_taxa_hits)
+cys_met_taxa_hits <- as.vector(t(cys_met_taxa_hits_raw), mode = "character")
+cys_met_taxa_hits <- gsub(";", "|", cys_met_taxa_hits)
+
+## selecting SRB that contain both dsrA and dsrB
+dsr_overlap %>% 
+  filter(dsrAB == 1) %>% 
+  select(genome) -> dsrAB_genids
+dsrAB_taxa <- uhgg_genid2taxa$V2[uhgg_genid2taxa$V1 %in% as.vector(t(dsrAB_genids), mode = "character")]
+
+## subsetting kraken2 RA controls data for SRB
+dsr_RA <- kraken2_RA_controls[dsrAB_taxa, ]
+dsr_cs <- colSums(dsr_RA)
+
+## subsetting kraken2 RA data for cys_met degrading bacteria
+cys_met_overlap %>%
+  filter(cysteine == 1) %>%
+  select(genome) -> cys_genids
+cys_taxa <- uhgg_genid2taxa$V2[uhgg_genid2taxa$V1 %in% as.vector(t(cys_genids), mode = "character")]
+cys_RA <- kraken2_RA_controls[cys_taxa, ]
+cys_deg_cs <- colSums(cys_RA)
+
+cys_met_overlap %>%
+  filter(methionine == 1) %>%
+  select(genome) -> met_genids
+met_taxa <- uhgg_genid2taxa$V2[uhgg_genid2taxa$V1 %in% as.vector(t(met_genids), mode = "character")]
+met_RA <- kraken2_RA_controls[met_taxa, ]
+met_deg_cs <- colSums(met_RA)
+
+
+cys_met_overlap %>%
+  filter(cysteine ==1, methionine == 1) %>%
+  select(genome) -> cys_met_genids
+cys_met_taxa <- uhgg_genid2taxa$V2[uhgg_genid2taxa$V1 %in% as.vector(t(cys_met_genids), mode = "character")]
+cys_met_RA <- kraken2_RA_controls[cys_met_taxa, ]
+both_deg_cs <- colSums(cys_met_RA)
+```
+
+
+## Prevalance of SRB & Cys & Met degrading bacteria in healthy controls
+
+```{r}
+# ## CYSTEINE
+# cys_indicies <- list(mode = "integer")
+# for (i in 1:length(cys_taxa_hits_spp)) {
+#   # cys_indicies[[i]] <- grep(cys_taxa_hits_spp[i], rownames(control_RA))
+#   cys_indicies[[i]] <- grep(cys_taxa_hits_spp[i], rownames(kraken2_RA))
+# }
+# cys_indicies <- unlist(cys_indicies)
+# cys_indicies <- unique(cys_indicies) # sanity check, no repeat rows
+# 
+# # subsetting rel. abund. of cysteine deg bacteria
+# cys_deg_RA <- control_RA[cys_indicies, ]
+# dim(cys_deg_RA)
+# 
+# # removing rows with __t in the taxa name... leading to double counting of RA
+# cys_deg_RA <- cys_deg_RA[-grep("t__", rownames(cys_deg_RA)), ]
+# dim(cys_deg_RA)
+# 
+# # computing colSums and calculating XX% prevalance of cys. deg. bac.
+# cys_deg_cs <- colSums(cys_deg_RA)
+# sum(cys_deg_cs > 0) / length(cys_deg_cs)
+# 
+# ## METHIONINE
+# met_indicies <- list(mode = "integer")
+# for (i in 1:length(met_taxa_hits_spp)) {
+#   met_indicies[[i]] <- grep(met_taxa_hits_spp[i], rownames(kraken2_RA))
+# }
+# met_indicies <- unlist(met_indicies)
+# met_indicies <- unique(met_indicies) # sanity check, no repeat rows
+# 
+# # subsetting rel. abund. of cysteine deg bacteria
+# met_deg_RA <- control_RA[met_indicies, ]
+# dim(met_deg_RA)
+# 
+# # removing rows with __t in the taxa name... leading to double counting of RA
+# met_deg_RA <- met_deg_RA[-grep("t__", rownames(met_deg_RA)), ]
+# dim(met_deg_RA)
+# 
+# # computing colSums and calculating XX% prevalance of cys. deg. bac.
+# met_deg_cs <- colSums(met_deg_RA)
+# sum(met_deg_cs > 0) / length(met_deg_cs)
+# 
+# ## BOTH (CYSTEINE AND METHIONINE)
+# both_indicies <- list(mode = "integer")
+# for (i in 1:length(both_taxa_hits_spp)) {
+#   both_indicies[[i]] <- grep(both_taxa_hits_spp[i], rownames(kraken2_RA))
+# }
+# both_indicies <- unlist(both_indicies)
+# both_indicies <- unique(both_indicies) # sanity check, no repeat rows
+# 
+# # subsetting rel. abund. of cysteine deg bacteria
+# both_deg_RA <- control_RA[both_indicies, ]
+# dim(both_deg_RA)
+# 
+# # removing rows with __t in the taxa name... leading to double counting of RA
+# both_deg_RA <- both_deg_RA[-grep("t__", rownames(both_deg_RA)), ]
+# dim(both_deg_RA)
+# 
+# # computing colSums and calculating XX% prevalance of cys. deg. bac.
+# both_deg_cs <- colSums(both_deg_RA)
+# sum(both_deg_cs > 0) / length(both_deg_cs)
+# 
+# ## DSR INDICIES
+# dsr_indicies <- list(mode = "integer")
+# for (i in 1:length(dsr_taxa_hits_spp)) {
+#   dsr_indicies[[i]] <- grep(dsr_taxa_hits_spp[i], rownames(kraken2_RA))
+# }
+# dsr_indicies <- unlist(dsr_indicies)
+# dsr_indicies <- unique(dsr_indicies) # sanity check, no repeat rows
+# 
+# # subsetting rel. abund. of cysteine deg bacteria
+# dsr_RA <- control_RA[dsr_indicies, ]
+# dim(dsr_RA)
+# 
+# # removing rows with __t in the taxa name... leading to double counting of RA
+# dsr_RA <- dsr_RA[-grep("t__", rownames(dsr_RA)), ]
+# dim(dsr_RA)
+# 
+# # computing colSums and calculating XX% prevalance of cys. deg. bac.
+# dsr_cs <- colSums(dsr_RA)
+# sum(dsr_cs > 0) / length(dsr_cs)
+```
+
+
+# Comparing abundance of SRB and Cys/Met Deg. Bacteria
+
+[X] - TODO: add columns for methionine degrading and both degrading
 
 ```{r}
 # prepping data for plotting
-sulf_red_RA <- t(sulf_red_RA)
-sulf_red_cs <- colSums(sulf_red_RA)
-sulf_red_summary <- summary(sulf_red_cs)
-sulf_red_summary
-cys_deg_summary <- summary(cys_deg_cs)
-cys_deg_summary
-
-df <- data.frame(sulf_red = sulf_red_cs,
-                 cys_deg = cys_deg_cs)
+df <- data.frame(cysteine = cys_deg_cs, # NOTE: these things are what are imortant for plots
+                 methionine = met_deg_cs,
+                 cys_met = both_deg_cs,
+                 dsr = dsr_cs
+                 )
 
 # plotting abundances of sulf(ai)te red bac and cys deg bac
-ggplot(stack(df), aes(x = ind, y = values)) +
-  geom_boxplot(outlier.alpha = 0.12) + 
-  stat_summary(fun.y = mean, geom = "point", shape = 4, size = 4) +
-  scale_y_continuous(breaks = seq(0, 100, by = 10)) + 
-  # geom_hline(yintercept = median(df$cys_deg), color = "red", linetype = "dashed") +
-  ggtitle("Comparing relative abundances of two H2S producing pathways") +
-  xlab("type of H2S producing bacteria") + ylab("Relative Abundance (%)") + 
-  theme_linedraw()
-ggsave("../figures/sulfRed_vs_cysDeg_abundances.png")
+cys_met_dsr_healthy_RA <- ggplot(melt(df), aes(x = factor(variable), y = value, fill = factor(variable))) +
+  geom_violin() + 
+  # geom_boxplot(outlier.alpha = 0.12) + geom_jitter(aes(alpha = 0.001)) +
+  stat_summary(fun = median, geom = "point", shape = 1, size = 4) +
+  stat_summary(fun = mean, geom = "point", shape = 4, size = 4) +
+  scale_shape_manual("", values=c("mean" = "X")) +
+  scale_fill_manual(values = c("#FF0000", "#0000FF", "#7F0080", "#FD9409")) +
+  scale_y_continuous(breaks = c(0.01, 0.1, 1, 10, 100),  trans = "log2", labels = label_comma(accuracy = 0.01)) +
+  ggtitle("Relative microbial abundances across H2S production pathways") +
+  ylab("Relative microbial abundances; log2(%)") + labs(fill = "Function") + 
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        axis.title.y = element_text(size = 15),
+        plot.title = element_text(size = 15),
+        legend.position = "none") 
+cys_met_dsr_healthy_RA
+ggsave("../figures/dsr_cys_and_met_healthy_abundances.svg", plot = cys_met_dsr_healthy_RA)
+
+
+# ## TESTING
+# data <- data.frame(v1 = rnorm(100), v2 = rnorm(100), v3 = rnorm(100), v4=rnorm(100))
+# library(reshape)
+# meltData <- melt(data)
+# ggplot(meltData, aes(factor(variable), value)) + 
+#   geom_boxplot() + facet_wrap(~variable, scale = "free")
+
 ```
 
-### Comparison of cysteine degrading and methionine degrading bacteria
+## Comparing dsr, cys, met and cys_met RAs across at risk populations
+
+This next figure will be the second major results figure of the paper and it will compare relative abundances of the 4 differnt classes of h2s producing bacteria across various at risk populations (IBD, CRC and (maybe) patients being treated with AR... this part doesnt matter as much as getting the plot started). 
 
 ```{r}
-## load in pie chart file
-cys_met_overlap <- read.table("../results/from-GutFunFind/H2S_production.pichart.txt", skip = 7)
-rownames(cys_met_overlap) <- cys_met_overlap$V1
-cys_met_overlap %>%
-  select(V4, V5, V6, V7) -> cys_met_overlap
-colnames(cys_met_overlap) <- c("both", "absent", "methionine", "cysteine")
-set1 <- cys_met_overlap %>% filter(methionine > 0) %>% rownames()
-set2 <- cys_met_overlap %>% filter(cysteine > 0) %>% rownames()
-# set3 <- tmp %>% filter(both > 0) %>% rownames()
+## setting function indicies
+cys_all_RA <- all_RA[cys_indicies, ]
+met_all_RA <- all_RA[met_indicies, ]
+cys_met_all_RA <- all_RA[both_indicies, ]
+dsr_all_RA <- all_RA[dsr_indicies, ]
 
-## venn diagram showing overlap between cys and met degrading functionality
-venn.diagram(
-  x = list(set1, set2),
-  category.names = c("methionine" , "cysteine"),
-  filename = "../figures/cys_met_overlap.png",
-  output = TRUE,
-          imagetype="png" ,
-          height = 480,
-          width = 480,
-          resolution = 300,
-          lwd = 1,
-          col = c("blue", "red"),
-          fill = c(alpha("blue",0.3), alpha('red',0.3)),
-          cex = 0.5,
-          fontfamily = "sans",
-          cat.cex = 0.3,
-          cat.default.pos = "outer",
-          cat.pos = c(-27, 27),
-          cat.dist = c(0.055, 0.055),
-          cat.fontfamily = "sans",
-          cat.col = c("blue", "red"),
-)
+## removing rows with __t in the taxa name... leading to double counting of RA
+cys_all_RA <- cys_all_RA[-grep("t__", rownames(cys_all_RA)), ]
+cys_all_cs <- colSums(cys_all_RA)
+met_all_RA <- met_all_RA[-grep("t__", rownames(met_all_RA)), ]
+met_all_cs <- colSums(met_all_RA)
+cys_met_all_RA <- cys_met_all_RA[-grep("t__", rownames(cys_met_all_RA)), ]
+cys_met_all_cs <- colSums(cys_met_all_RA)
+dsr_all_RA <- dsr_all_RA[-grep("t__", rownames(dsr_all_RA)), ]
+dsr_all_cs <- colSums(dsr_all_RA)
+
+## filtering pData to only include populations for plotting
+all_pData %>%
+  filter(study_condition == c("IBD", "CRC", "control")) -> risk_pData
+cys_risk_cs <- cys_all_cs[names(cys_all_cs) %in% rownames(risk_pData)]
+met_risk_cs <- met_all_cs[names(met_all_cs) %in% rownames(risk_pData)]
+cys_met_risk_cs <- cys_met_all_cs[names(cys_met_all_cs) %in% rownames(risk_pData)]
+dsr_risk_cs <- dsr_all_cs[names(dsr_all_cs) %in% rownames(risk_pData)]
+
+## making the necessary dataframe
+cys_df <- data.frame(func = rep("cysteine", length(cys_risk_cs)), 
+                 RA = cys_risk_cs,
+                 population = risk_pData$study_condition)
+met_df <- data.frame(func = rep("methionine", length(met_risk_cs)), 
+                 RA = met_risk_cs,
+                 population = risk_pData$study_condition)
+cys_met_df <- data.frame(func = rep("cys_and_met", length(cys_met_risk_cs)), 
+                 RA = cys_met_risk_cs,
+                 population = risk_pData$study_condition)
+dsr_df <- data.frame(func = rep("dsr", length(dsr_risk_cs)), 
+                 RA = dsr_risk_cs,
+                 population = risk_pData$study_condition)
+
+# =============================== KRAKEN DATA =============================== #
+
+## setting function indicies
+cys_k2_RA <- kraken2_RA[cys_indicies, ]
+met_all_RA <- all_RA[met_indicies, ]
+cys_met_all_RA <- all_RA[both_indicies, ]
+dsr_all_RA <- all_RA[dsr_indicies, ]
+```
+
+The previous chunk is for prepping the dataframes to be plotted and the following chunk is for plotting said data.
+
+```{r}
+clrs <- c("grey", "gold2", "green3")
+cys_boxplot <- ggplot(cys_df) + 
+  geom_boxplot(aes(x = func, y = RA, fill = population)) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  scale_y_continuous(
+                     breaks = c(1, 10, 100),
+                     trans = "log2") +
+  scale_fill_manual(values = clrs) +
+  ylab("Relative Abundance (log2(%))") + xlab("")
+# cys_boxplot
+met_boxplot <- ggplot(met_df) + 
+  geom_boxplot(aes(x = func, y = RA, fill = population)) +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.title.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank()) +
+  scale_y_continuous(limits = c(0.0001, 100),
+                     breaks = c(1, 10, 100),
+                     trans = "log2", 
+                     minor_breaks = NULL) +
+  scale_fill_manual(values = clrs) +
+  xlab("")
+# met_boxplot
+cys_met_boxplot <- ggplot(cys_met_df) + 
+  geom_boxplot(aes(x = func, y = RA, fill = population)) +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.title.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank()) +
+  scale_y_continuous(limits = c(0.001, 100),
+                     breaks = c(1, 10, 100), 
+                     trans = "log2", 
+                     minor_breaks = NULL) +
+  scale_fill_manual(values = clrs) +
+  xlab("")
+# cys_met_boxplot
+dsr_boxplot <- ggplot(dsr_df) + 
+  geom_boxplot(aes(x = func, y = RA, fill = population)) +
+  theme_bw() +
+  theme(axis.title.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank()) +
+  scale_y_continuous(limits = c(0.001, 100),
+                     breaks = c(1, 10, 100), 
+                     trans = "log2", 
+                     minor_breaks = NULL) +
+  scale_fill_manual(values = clrs) +
+
+  xlab("")
+# dsr_boxplot
+
+# =========================================================================== #
+
+## ARRANGING PLOTS 
+cys_boxplot | met_boxplot | cys_met_boxplot | dsr_boxplot
+ggsave("../figures/RA_across_risk_populations.png", height = 4, width = 7)
+
+```
+
+
+```{r}
+## TESTING
+
+ggplot(mpg) +
+    geom_bar(aes(x = class), fill = 'blue')
+
+ggplot(mpg) +
+    geom_bar(aes(x = class, fill = drv))
+
+ggplot(mpg) + 
+    geom_bar(aes(x = class, fill = factor(cyl)), position = position_dodge(preserve = 'single'))
+```
+
+
+# Attic
+
+## Prevalence of sulfite reducing bacteria in healthy controls
+
+```{r}
+# # getting B. wadsworthia prevalence
+# b_wad <- control_RA[grep("s__Bilophila_wadsworthia$", rownames( control_RA)), ]
+# b_wad_summary <- summary(b_wad)
+# b_wad_sd <- sd(b_wad)
+# b_wad_prev <- sum(b_wad > 0) / length(b_wad)
+```
+
+## Prevalence of sulfate reducing bacteria
+
+```{r}
+# ## getting Desulfovibrio spp: piger, desulfuricans, gigas
+# d_piger <- control_RA[grep("s__Desulfovibrio_piger$", rownames(control_RA)), ]
+# d_piger_summary <- summary(d_piger)
+# d_piger_sd <- sd(d_piger)
+# d_piger_prev <- sum(d_piger > 0) / length(d_piger)
+# 
+# ## desulfricans
+# d_desulf <- control_RA[grep("s__Desulfovibrio_desulfuricans$", rownames(control_RA)), ]
+# d_desulf_summary <- summary(d_desulf)
+# d_desulf_sd <- sd(d_desulf)
+# d_desulf_prev <- sum(d_desulf > 0) / length(d_desulf)
+# 
+# ## gigas
+# d_gigas <- control_RA[grep("s__Desulfovibrio_gigas$", rownames(control_RA)), ]
+# d_gigas_summary <- summary(d_gigas)
+# d_gigas_sd <- sd(d_gigas)
+# d_gigas_prev <- sum(d_gigas > 0) / length(d_gigas)
+# 
+# ## presence of one or more of above 4 species
+# sulf_red_RA <- data.frame(b_wad = b_wad, 
+#                        d_piger = d_piger,
+#                        d_desulf = d_desulf,
+#                        d_gigas = d_gigas)
+# sulf_red_RA_rs <- rowSums(sulf_red_RA)
+# sulf_red_RA_prev <- sum(sulf_red_RA_rs > 0) / length(sulf_red_RA_rs)
+```
+
+## Comparison of cysteine degrading and methionine degrading bacteria
+
+```{r}
+# ## load in pie chart file
+# cys_met_overlap <- read.table("../results/from-GutFunFind/H2S_production.pichart.txt", skip = 7)
+# rownames(cys_met_overlap) <- cys_met_overlap$V1
+# cys_met_overlap %>%
+#   select(V4, V5, V6, V7) -> cys_met_overlap
+# colnames(cys_met_overlap) <- c("both", "absent", "methionine", "cysteine")
+# set1 <- cys_met_overlap %>% filter(methionine > 0) %>% rownames()
+# set2 <- cys_met_overlap %>% filter(cysteine > 0) %>% rownames()
+# # set3 <- tmp %>% filter(both > 0) %>% rownames()
+# 
+# ## venn diagram showing overlap between cys and met degrading functionality
+# venn.diagram(
+#   x = list(set1, set2),
+#   category.names = c("methionine" , "cysteine"),
+#   filename = "../figures/cys_met_overlap.png",
+#   output = TRUE,
+#           imagetype="png" ,
+#           height = 480,
+#           width = 480,
+#           resolution = 300,
+#           lwd = 1,
+#           col = c("blue", "red"),
+#           fill = c(alpha("blue",0.3), alpha('red',0.3)),
+#           cex = 0.5,
+#           fontfamily = "sans",
+#           cat.cex = 0.3,
+#           cat.default.pos = "outer",
+#           cat.pos = c(-27, 27),
+#           cat.dist = c(0.055, 0.055),
+#           cat.fontfamily = "sans",
+#           cat.col = c("blue", "red"),
+# )
+```
+
+## Processing taxa_hits from GutFunFind to match with metaphlan2 results
+
+The below code takes an initial 493 taxa hits from `GutFunFind` and filters out names without species level resolition. A number of other modifications were also made to make the taxonomic name searchable against the identifiers present in `curatedMetagenomicData`. The variable `taxa_hits_spp` contains a final list of 254 Genus_species names with cysteine degrading potential.
+
+```{r}
+# cys_met_taxa_hits <- as.vector(t(cys_met_taxa_hits_raw), mode = "character") # df -> vector
+# cys_met_taxa_hits <- strsplit(cys_met_taxa_hits, ";")
+# 
+# ## extracting species names from taxa hits
+# cys_met_taxa_hits_spp <- vector(mode = "character", length = length(cys_met_taxa_hits)) # create empty caracter vector
+# for (i in 1:length(cys_met_taxa_hits)) {
+#   current_spp <- gsub(pattern = "s__", replacement = "", cys_met_taxa_hits[[i]][7])
+#   cys_met_taxa_hits_spp[i] <- current_spp
+# }
+# 
+# ## subetting feature table to non-absent representative genomes (contained in dsr_taxa_hits_raw)
+# filter(cys_met_overlap, absent == 0) -> cys_met_overlap_present
+# 
+# ## removing empty species names
+# cys_met_overlap_present <- cys_met_overlap_present[cys_met_taxa_hits_spp != "", ] # simultaneously subsetting the feature table
+# cys_met_taxa_hits_spp <- cys_met_taxa_hits_spp[cys_met_taxa_hits_spp != ""]
+# dim(cys_met_overlap_present)
+# length(cys_met_taxa_hits_spp)
+# 
+# ## removing Co-Abundance gene Groups (CAGs), GCAs (?), etc.
+# if (length(grep("CAG", cys_met_taxa_hits_spp)) == 0) {
+#   # do nothing
+# } else if (length(grep("CAG", cys_met_taxa_hits_spp)) > 0) {
+#   cys_met_overlap_present <- cys_met_overlap_present[-grep("CAG", cys_met_taxa_hits_spp), ]
+#   cys_met_taxa_hits_spp <- cys_met_taxa_hits_spp[-grep("CAG", cys_met_taxa_hits_spp)]
+# }
+# dim(cys_met_overlap_present)
+# length(cys_met_taxa_hits_spp)
+# if (length(grep("GCA", cys_met_taxa_hits_spp)) == 0) {
+#   # do nothing
+# } else if (length(grep("GCA", cys_met_taxa_hits_spp)) > 0) {
+#   cys_met_overlap_present <- cys_met_overlap_present[-grep("GCA", cys_met_taxa_hits_spp), ]
+#   cys_met_taxa_hits_spp <- cys_met_taxa_hits_spp[-grep("GCA", cys_met_taxa_hits_spp)]
+# }
+# dim(cys_met_overlap_present)
+# length(cys_met_taxa_hits_spp)
+# if (length(grep("sp[0-9]*", cys_met_taxa_hits_spp)) == 0) {
+#   # do nothing
+# } else if (length(grep("sp[0-9]*", cys_met_taxa_hits_spp)) > 0) {
+#   cys_met_overlap_present <- cys_met_overlap_present[-grep("sp[0-9]*", cys_met_taxa_hits_spp), ]
+#   cys_met_taxa_hits_spp <- cys_met_taxa_hits_spp[-grep("sp[0-9]*", cys_met_taxa_hits_spp)]
+# }
+# dim(cys_met_overlap_present)
+# length(cys_met_taxa_hits_spp)
+# 
+# ## subetting based on function hits (complicated for cys met)
+# 
+# ### cys degrading
+# cys_taxa_hits_spp <- cys_met_taxa_hits_spp[cys_met_overlap_present$cysteine == 1]
+# cys_overlap_present <- cys_met_overlap_present[cys_met_overlap_present$cysteine == 1, ]
+# dim(cys_overlap_present)
+# length(cys_taxa_hits_spp)
+# #### removing oddities from names like "_A", "_X", etc.
+# for (i in 1:length(cys_taxa_hits_spp)) {
+#   current_name <- gsub("_.", "", cys_taxa_hits_spp[i])
+#   current_name <- gsub(" ", "_", current_name)
+#   cys_taxa_hits_spp[i] <- current_name
+# }
+# #### removing duplicates of species names
+# cys_taxa_hits_spp <- unique(cys_taxa_hits_spp)
+# length(cys_taxa_hits_spp)
+# 
+# ### met degrading
+# met_taxa_hits_spp <- cys_met_taxa_hits_spp[cys_met_overlap_present$methionine == 1]
+# met_overlap_present <- cys_met_overlap_present[cys_met_overlap_present$methionine == 1, ]
+# dim(met_overlap_present)
+# length(met_taxa_hits_spp)
+# #### removing oddities from names like "_A", "_X", etc.
+# for (i in 1:length(met_taxa_hits_spp)) {
+#   current_name <- gsub("_.", "", met_taxa_hits_spp[i])
+#   current_name <- gsub(" ", "_", current_name)
+#   met_taxa_hits_spp[i] <- current_name
+# }
+# #### removing duplicates of species names
+# met_taxa_hits_spp <- unique(met_taxa_hits_spp)
+# length(met_taxa_hits_spp)
+# 
+# ### both degrading
+# both_taxa_hits_spp <- cys_met_taxa_hits_spp[(cys_met_overlap_present$methionine == 1 & cys_met_overlap_present$cysteine == 1)]
+# both_overlap_present <- cys_met_overlap_present[(cys_met_overlap_present$methionine == 1 & cys_met_overlap_present$cysteine == 1), ]
+# dim(both_overlap_present)
+# length(both_taxa_hits_spp)
+# #### removing oddities from names like "_A", "_X", etc.
+# for (i in 1:length(both_taxa_hits_spp)) {
+#   current_name <- gsub("_.", "", both_taxa_hits_spp[i])
+#   current_name <- gsub(" ", "_", current_name)
+#   both_taxa_hits_spp[i] <- current_name
+# }
+# #### removing duplicates of species names
+# both_taxa_hits_spp <- unique(both_taxa_hits_spp)
+# length(both_taxa_hits_spp)
 ```
 
 ```{r}
-## comparison of cys / met degrading bac using upsetR
-library(UpSetR)
-
+# dsr_taxa_hits <- as.vector(t(dsr_taxa_hits_raw), mode = "character") # df -> vector
+# dsr_taxa_hits <- strsplit(dsr_taxa_hits, ";")
+# tmp <- unlist(dsr_taxa_hits)
+# ## extracting species names from taxa hits
+# dsr_taxa_hits_spp <- vector(mode = "character", length = length(dsr_taxa_hits)) # create empty caracter vector
+# for (i in 1:length(dsr_taxa_hits)) {
+#   current_spp <- gsub(pattern = "s__", replacement = "", dsr_taxa_hits[[i]][7])
+#   dsr_taxa_hits_spp[i] <- current_spp
+# }
+# 
+# ## subetting feature table to non-absent representative genomes (contained in dsr_taxa_hits_raw)
+# filter(dsr_overlap, absent == 0) -> dsr_overlap_present
+# 
+# ### for use in debugging gutfunfind results for diss. sulf.
+# # tmp_taxa <- dsr_taxa_hits[dsr_overlap_present$dsrAB == 1] ## NOTE: the version of `dsr_taxa_hits` required for this step
+# #                                                           ## is the version outputted immediately after the _raw line
+# # tmp_func <- filter(dsr_overlap_present, dsrAB == 1)
+# # tmp_prob_genID <- tmp_func$genome[c(2,5,6,7,11,17,18,19,20,26)]
+# # tmp_problem_taxa <- tmp_taxa[c(2,5,6,7,11,17,18,19,20,26)]
+# # tmp_accep_genID <- tmp_func$genome[c(1,3,4,8,9,10,12,13,14,15,16,21,22,23,24,25,27)]
+# # tmp_accepted_taxa <- tmp_taxa[c(1,3,4,8,9,10,12,13,14,15,16,21,22,23,24,25,27)]
+# 
+# ## removing empty species names
+# dsr_overlap_present <- dsr_overlap_present[dsr_taxa_hits_spp != "", ] # simultaneously subsetting the feature table
+# dsr_taxa_hits_spp <- dsr_taxa_hits_spp[dsr_taxa_hits_spp != ""]
+# 
+# ## removing Co-Abundance gene Groups (CAGs), GCAs (?), etc.
+# if (length(grep("CAG", dsr_taxa_hits_spp)) == 0) {
+#   # do nothing
+# } else if (length(grep("CAG", dsr_taxa_hits_spp)) > 0) {
+#   dsr_overlap_present <- dsr_overlap_present[-grep("CAG", dsr_taxa_hits_spp), ]
+#   dsr_taxa_hits_spp <- dsr_taxa_hits_spp[-grep("CAG", dsr_taxa_hits_spp)]
+# }
+# dim(dsr_overlap_present)
+# length(dsr_taxa_hits_spp)
+# if (length(grep("GCA", dsr_taxa_hits_spp)) == 0) {
+#   # do nothing
+# } else if (length(grep("GCA", dsr_taxa_hits_spp)) > 0) {
+#   dsr_overlap_present <- dsr_overlap_present[-grep("GCA", dsr_taxa_hits_spp), ]
+#   dsr_taxa_hits_spp <- dsr_taxa_hits_spp[-grep("GCA", dsr_taxa_hits_spp)]
+# }
+# dim(dsr_overlap_present)
+# length(dsr_taxa_hits_spp)
+# if (length(grep("sp[0-9]*", dsr_taxa_hits_spp)) == 0) {
+#   # do nothing
+# } else if (length(grep("sp[0-9]*", dsr_taxa_hits_spp)) > 0) {
+#   dsr_overlap_present <- dsr_overlap_present[-grep("sp[0-9]*", dsr_taxa_hits_spp), ]
+#   dsr_taxa_hits_spp <- dsr_taxa_hits_spp[-grep("sp[0-9]*", dsr_taxa_hits_spp)]
+# }
+# dim(dsr_overlap_present)
+# length(dsr_taxa_hits_spp)
+# 
+# ## subsetting based on function hits (for example, dsrAB must be present)
+# dsr_taxa_hits_spp <- dsr_taxa_hits_spp[dsr_overlap_present$dsrAB == 1]
+# dsr_overlap_present <- dsr_overlap_present[dsr_overlap_present$dsrAB == 1, ]
+# dim(dsr_overlap_present)
+# length(dsr_taxa_hits_spp)
+# 
+# ## removing oddities from names like "_A", "_X", etc.
+# for (i in 1:length(dsr_taxa_hits_spp)) {
+#   current_name <- gsub("_.", "", dsr_taxa_hits_spp[i])
+#   current_name <- gsub(" ", "_", current_name)
+#   dsr_taxa_hits_spp[i] <- current_name
+# }
+# length(dsr_taxa_hits_spp)
+# 
+# ## removing duplicates of species names
+# dsr_taxa_hits_spp <- unique(dsr_taxa_hits_spp)
+# length(dsr_taxa_hits_spp)
 ```
 
+```{r}
+# indicies <- list(mode = "integer")
+# for (i in 1:length(dsr_taxa_hits_spp)) {
+#   indicies[[i]] <- grep(dsr_taxa_hits_spp[i], rownames(control_RA))
+# }
+# indicies <- unlist(indicies)
+# indicies <- unique(indicies) # sanity check, no repeat rows
+# 
+# # subsetting rel. abund. of dsr bacteria
+# dsr_RA <- control_RA[indicies, ]
+# dim(dsr_RA)
+# 
+# # removing rows with __t in the taxa name... leading to double counting of RA
+# dsr_RA <- dsr_RA[-grep("t__", rownames(dsr_RA)), ]
+# dim(dsr_RA)
+# 
+# # computing colSums and calculating XX% prevalance of cys. deg. bac.
+# dsr_cs <- colSums(dsr_RA)
+# sum(dsr_cs > 0) / length(dsr_cs)
+```
