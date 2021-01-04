@@ -1,7 +1,15 @@
 ## R
 *.Rproj*
 *.Rhistory*
+*.RDS
+*.rds
 
-# Mac
+## Mac
 *.DS_store*
 .Rproj.user
+
+## unwanted file extensions
+*.html
+~$*
+*.png
+*.log
