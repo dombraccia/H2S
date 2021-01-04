@@ -1,0 +1,68 @@
+---
+title: "Exploring putative H2S producing bacteria in IBD, CRC and healthy individuals"
+author: "Domenick J. Braccia"
+date: "12/30/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Loading Libraries
+
+```{r message=FALSE, warning=FALSE}
+library(curatedMetagenomicData)
+library(tictoc)
+library(dplyr)
+library(ggplot2)
+library(VennDiagram)
+library(UpSetR)
+library(patchwork)
+library(cowplot)
+library(svglite)
+library(scales)
+library(reshape)
+```
+
+## Loading and Processing Data
+
+```{r}
+source("process_data.R")
+```
+
+## Overlap of cys degrading enzymes
+
+upset plot for each cys degrading gene
+
+```{r, message=FALSE, warning=FALSE}
+## NOTE: only way to save this plot is by knitting the doc and clicking saveas on the figure
+source("upset.R")
+upset(cys_dsr_overlap, 
+      sets = c(new_gene_names, "dsrAB"), 
+      order.by = "freq", decreasing = TRUE,
+      matrix.color = c("grey23"), point.size = 2,
+      sets.bar.color = c(rep("#dd9e2f", 7), "#1c6bc9", rep("#dd9e2f", 2)),
+      main.bar.color = c(rep("#dd9e2f", 6), "#1c6bc9", rep("#dd9e2f", 23)),
+      text.scale = 1,
+      mainbar.y.label = "Number of species with gene") 
+```
+
+## cys degredation vs. DSR in healthy controls
+
+plotting the relative abundances of bacteria with cysteine degrading and sulfite reducing potential. Abundances come from `curatedMetagenomicData` studies. Here, we are looking at healthy controls in particular.
+
+```{r, message=FALSE, warning=FALSE}
+source("healthy_relative_abundances.R")
+cys_met_dsr_healthy_RA
+```
+
+## In at risk groups (IBD, CRC)
+
+```{r, message=FALSE, warning=FALSE}
+source("risk_relative_abundances.R")
+cys_k2_boxplot | dsrAB_k2_boxplot
+cys_k2_hmp2_boxplot | dsrAB_k2_hmp2_boxplot
+```
+

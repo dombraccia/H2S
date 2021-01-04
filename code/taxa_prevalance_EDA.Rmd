@@ -12,12 +12,13 @@ knitr::opts_chunk$set(echo = TRUE)
 # Overview
 
 TODOs:
-* [X] - generate prevalence of Sulfate and Sulfite Reducing Bacteria
+* [ ] - Include hmp2 kraken2 RA data into figures 2 & 3
+* [X] - (figure 3) subset controls to those associated with the IBD and CRC groups (adenoma is now included)
 
+* [X] - generate prevalence of Sulfate and Sulfite Reducing Bacteria
 * [X] - run GutFunFind on known genes and then expand list of cysteine reducing bacteria 
 * [X] - import list of cysteine degrading bacteria to this script
 * [X] - run same set of analyses on these names as the sulfate / sulfite reducing bac.
-
 * [X] - make boxplots for RA of sulfi(a)te red. bac. and RA of cys. deg. bac.
 
 
@@ -42,10 +43,10 @@ library(reshape)
 
 ```{r}
 if(file.exists("../data/all_data.RDS")) {
-  all_data <- readRDS("../data/all_data.RDS")
+  metaphlan2_data <- readRDS("../data/all_data.RDS")
 } else {
   tic()
-  all_data <- curatedMetagenomicData("*metaphlan_bugs_list.stool*", dryrun = FALSE)
+  metaphlan2_data <- curatedMetagenomicData("*metaphlan_bugs_list.stool*", dryrun = FALSE)
   saveRDS(all_data, file = "../data/all_data.RDS")
   toc()
 }
@@ -53,40 +54,56 @@ if(file.exists("../data/all_data.RDS")) {
 ## loading kraken2 data from Xiaofang
 kraken2_counts <- readRDS("../data/from-xiaofang/kraken2_output.rds")
 kraken2_pData <- readRDS("../data/from-xiaofang/metadata.rds")
+kraken2_hmp2_counts <- read.csv("../data/from-xiaofang/HMP2-IBD.mpa.txt", sep = "\t", header = TRUE, row.names = 1)
+kraken2_hmp2_pData <- read.csv("../data/from-xiaofang/hmp2_metadata.MGX.csv", header = TRUE) # NOTE: `diagnosis` column contains study condition information.
+kraken2_hmppilot_counts <- read.csv("../data/from-xiaofang/HMP-IBD-pilot.mpa.txt", sep = "\t", header = TRUE)
+kraken2_prism_counts <- read.csv("../data/from-xiaofang/merged.mpa.txt", sep = "\t", header = TRUE)
+prism_metadata_combined <- read.csv("../data/prism_combined_metadata_20201209.txt")
+
+## loading prism medatada
+# prism_metadata <- read.csv("../data/metadata-prism.txt", sep = "\t", header = TRUE)
+# prism_extra_metadata <- read.csv("../data/from-brantley/metadata_PRISM_NLIBD", header = TRUE)
+# colnames(prism_extra_metadata)[3] <- "LibraryName"
+# prism_combined_metadata <- merge(prism_metadata, prism_extra_metadata, by = "LibraryName")
+# write.table(prism_combined_metadata, file = "../data/prism_combined_metadata_20201209.txt", quote = FALSE, sep = "\t", row.names = FALSE)
+## all code above was for making the combined metadata file
 ```
 
 # Exploring data
 
 ```{r}
 ## merging all datasets
-all_data_merged <- mergeData(all_data)
-all_pData <- pData(all_data_merged)
-study_cond <- all_pData$study_condition
-study_cond_NA <- all_data_merged[,is.na(all_pData$study_condition) ]
+metaphlan2_data_merged <- mergeData(metaphlan2_data)
+metaphlan2_pData <- pData(metaphlan2_data_merged)
+study_cond <- metaphlan2_pData$study_condition
+study_cond_NA <- metaphlan2_data_merged[,is.na(metaphlan2_pData$study_condition) ]
 ```
 
 # Processing and subsetting data
 
 ```{r}
+# ============================ METAPHLAN2 DATA ============================== #
+
 ## removing NAs from pData
-all_pData <- all_pData[!is.na(all_pData$study_condition), ]
+metaphlan2_pData <- metaphlan2_pData[!is.na(metaphlan2_pData$study_condition), ]
 
 ## subsetting pData to study_condition == "controls"
-all_pData_controls <- all_pData %>% filter(study_condition == "control")
+metaphlan2_pData_controls <- metaphlan2_pData %>% filter(study_condition == "control")
 
 ## getting rid of NAs in relative abundance (RA) data
-all_RA <- exprs(all_data_merged)
-all_RA <- all_RA[, !is.na(all_pData$study_condition)]
+metaphlan2_RA <- exprs(metaphlan2_data_merged)
+metaphlan2_RA <- metaphlan2_RA[, !is.na(metaphlan2_pData$study_condition)]
 
 ## subsetting RA down to just present in control samples
-control_RA <- all_RA[, colnames(all_RA) %in% rownames(all_pData_controls)]
+metaphlan2_RA_controls <- metaphlan2_RA[, colnames(metaphlan2_RA) %in% rownames(metaphlan2_pData_controls)]
 
 # =============================== KRAKEN DATA =============================== #
 
 ## computing RA values from count info
 kraken2_counts_spp <- kraken2_counts[grep("s__", rownames(kraken2_counts)), ]
-kraken2_counts_spp
-kraken2_RA <- prop.table(kraken2_counts_spp, 2)
+kraken2_RA <- prop.table(kraken2_counts_spp, 2) * 100 ## counts -> RA (%)
+kraken2_hmp2_counts_spp <-  kraken2_hmp2_counts[grep("s__", rownames(kraken2_hmp2_counts)), ]
+kraken2_hmp2_RA <- prop.table(as.matrix(kraken2_hmp2_counts_spp), 2) * 100 ## counts -> RA (%)
 
 ## getting rid of RA data whose sample has study_condition == NA
 study_cond_NA <- kraken2_pData %>% filter(is.na(study_condition)) %>% rownames()
@@ -95,6 +112,12 @@ kraken2_pData <- filter(kraken2_pData, !is.na(study_condition))
 kraken2_pData %>% 
   filter(study_condition == "control") -> kraken2_pData_controls
 kraken2_RA_controls <- kraken2_RA[, colnames(kraken2_RA) %in% rownames(kraken2_pData_controls)]
+
+## removing duplicate metadata sample entries
+kraken2_hmp2_pData <- kraken2_hmp2_pData[-grep("_", kraken2_hmp2_pData$External.ID), ]
+
+## modifying kraken2_hmp2_pData$External.ID column for compatability with RA
+# kraken2_hmp2_pData$External.ID.mod <- sapply(strsplit(kraken2_hmp2_pData$External.ID, "_"), "[", 1)
 ```
 
 
@@ -102,6 +125,7 @@ kraken2_RA_controls <- kraken2_RA[, colnames(kraken2_RA) %in% rownames(kraken2_p
 
 ## Importing results from GutFunFind
 
+upset plot
 ```{r}
 ## comparison of cys / met degrading bac using upsetR
 cys_met_feature <- read.table("../results/from-GutFunFind/Cysteine_and_Methionine_Degradation.feature.tsv")
@@ -180,130 +204,359 @@ dsr_overlap %>%
 dsrAB_taxa <- uhgg_genid2taxa$V2[uhgg_genid2taxa$V1 %in% as.vector(t(dsrAB_genids), mode = "character")]
 
 ## subsetting kraken2 RA controls data for SRB
-dsr_RA <- kraken2_RA_controls[dsrAB_taxa, ]
-dsr_cs <- colSums(dsr_RA)
+dsr_k2_RA_controls <- kraken2_RA_controls[dsrAB_taxa, ]
+dsr_k2_cs_controls <- colSums(dsr_k2_RA_controls)
 
 ## subsetting kraken2 RA data for cys_met degrading bacteria
 cys_met_overlap %>%
   filter(cysteine == 1) %>%
   select(genome) -> cys_genids
 cys_taxa <- uhgg_genid2taxa$V2[uhgg_genid2taxa$V1 %in% as.vector(t(cys_genids), mode = "character")]
-cys_RA <- kraken2_RA_controls[cys_taxa, ]
-cys_deg_cs <- colSums(cys_RA)
+cys_k2_RA_controls <- kraken2_RA_controls[cys_taxa, ]
+cys_k2_cs_controls <- colSums(cys_k2_RA_controls)
 
 cys_met_overlap %>%
   filter(methionine == 1) %>%
   select(genome) -> met_genids
 met_taxa <- uhgg_genid2taxa$V2[uhgg_genid2taxa$V1 %in% as.vector(t(met_genids), mode = "character")]
-met_RA <- kraken2_RA_controls[met_taxa, ]
-met_deg_cs <- colSums(met_RA)
+met_k2_RA_controls <- kraken2_RA_controls[met_taxa, ]
+met_k2_cs_controls <- colSums(met_k2_RA_controls)
 
 
 cys_met_overlap %>%
   filter(cysteine ==1, methionine == 1) %>%
   select(genome) -> cys_met_genids
 cys_met_taxa <- uhgg_genid2taxa$V2[uhgg_genid2taxa$V1 %in% as.vector(t(cys_met_genids), mode = "character")]
-cys_met_RA <- kraken2_RA_controls[cys_met_taxa, ]
-both_deg_cs <- colSums(cys_met_RA)
+cys_met_k2_RA_controls <- kraken2_RA_controls[cys_met_taxa, ]
+cys_met_k2_cs_controls <- colSums(cys_met_k2_RA_controls)
 ```
 
 
-## Prevalance of SRB & Cys & Met degrading bacteria in healthy controls
 
+## Using metaphlan2 values as relative abundance data
+
+In order to use the metaphlan2 values as the input to the RA plots, lots of processing needs to be done on the taxa hits returned by GutFunFind. I am keeping all of these processing steps here for plotting later.
+
+cys, met, cys_met
 ```{r}
-# ## CYSTEINE
-# cys_indicies <- list(mode = "integer")
-# for (i in 1:length(cys_taxa_hits_spp)) {
-#   # cys_indicies[[i]] <- grep(cys_taxa_hits_spp[i], rownames(control_RA))
-#   cys_indicies[[i]] <- grep(cys_taxa_hits_spp[i], rownames(kraken2_RA))
-# }
-# cys_indicies <- unlist(cys_indicies)
-# cys_indicies <- unique(cys_indicies) # sanity check, no repeat rows
-# 
-# # subsetting rel. abund. of cysteine deg bacteria
-# cys_deg_RA <- control_RA[cys_indicies, ]
-# dim(cys_deg_RA)
-# 
-# # removing rows with __t in the taxa name... leading to double counting of RA
-# cys_deg_RA <- cys_deg_RA[-grep("t__", rownames(cys_deg_RA)), ]
-# dim(cys_deg_RA)
-# 
-# # computing colSums and calculating XX% prevalance of cys. deg. bac.
-# cys_deg_cs <- colSums(cys_deg_RA)
-# sum(cys_deg_cs > 0) / length(cys_deg_cs)
-# 
-# ## METHIONINE
-# met_indicies <- list(mode = "integer")
-# for (i in 1:length(met_taxa_hits_spp)) {
-#   met_indicies[[i]] <- grep(met_taxa_hits_spp[i], rownames(kraken2_RA))
-# }
-# met_indicies <- unlist(met_indicies)
-# met_indicies <- unique(met_indicies) # sanity check, no repeat rows
-# 
-# # subsetting rel. abund. of cysteine deg bacteria
-# met_deg_RA <- control_RA[met_indicies, ]
-# dim(met_deg_RA)
-# 
-# # removing rows with __t in the taxa name... leading to double counting of RA
-# met_deg_RA <- met_deg_RA[-grep("t__", rownames(met_deg_RA)), ]
-# dim(met_deg_RA)
-# 
-# # computing colSums and calculating XX% prevalance of cys. deg. bac.
-# met_deg_cs <- colSums(met_deg_RA)
-# sum(met_deg_cs > 0) / length(met_deg_cs)
-# 
-# ## BOTH (CYSTEINE AND METHIONINE)
-# both_indicies <- list(mode = "integer")
-# for (i in 1:length(both_taxa_hits_spp)) {
-#   both_indicies[[i]] <- grep(both_taxa_hits_spp[i], rownames(kraken2_RA))
-# }
-# both_indicies <- unlist(both_indicies)
-# both_indicies <- unique(both_indicies) # sanity check, no repeat rows
-# 
-# # subsetting rel. abund. of cysteine deg bacteria
-# both_deg_RA <- control_RA[both_indicies, ]
-# dim(both_deg_RA)
-# 
-# # removing rows with __t in the taxa name... leading to double counting of RA
-# both_deg_RA <- both_deg_RA[-grep("t__", rownames(both_deg_RA)), ]
-# dim(both_deg_RA)
-# 
-# # computing colSums and calculating XX% prevalance of cys. deg. bac.
-# both_deg_cs <- colSums(both_deg_RA)
-# sum(both_deg_cs > 0) / length(both_deg_cs)
-# 
-# ## DSR INDICIES
-# dsr_indicies <- list(mode = "integer")
-# for (i in 1:length(dsr_taxa_hits_spp)) {
-#   dsr_indicies[[i]] <- grep(dsr_taxa_hits_spp[i], rownames(kraken2_RA))
-# }
-# dsr_indicies <- unlist(dsr_indicies)
-# dsr_indicies <- unique(dsr_indicies) # sanity check, no repeat rows
-# 
-# # subsetting rel. abund. of cysteine deg bacteria
-# dsr_RA <- control_RA[dsr_indicies, ]
-# dim(dsr_RA)
-# 
-# # removing rows with __t in the taxa name... leading to double counting of RA
-# dsr_RA <- dsr_RA[-grep("t__", rownames(dsr_RA)), ]
-# dim(dsr_RA)
-# 
-# # computing colSums and calculating XX% prevalance of cys. deg. bac.
-# dsr_cs <- colSums(dsr_RA)
-# sum(dsr_cs > 0) / length(dsr_cs)
+cys_met_taxa_hits <- as.vector(t(cys_met_taxa_hits_raw), mode = "character") # df -> vector
+cys_met_taxa_hits <- strsplit(cys_met_taxa_hits, ";")
+
+## extracting species names from taxa hits
+cys_met_taxa_hits_spp <- vector(mode = "character", length = length(cys_met_taxa_hits)) # create empty caracter vector
+for (i in 1:length(cys_met_taxa_hits)) {
+  current_spp <- gsub(pattern = "s__", replacement = "", cys_met_taxa_hits[[i]][7])
+  cys_met_taxa_hits_spp[i] <- current_spp
+}
+
+## subetting feature table to non-absent representative genomes (contained in dsr_taxa_hits_raw)
+filter(cys_met_overlap, absent == 0) -> cys_met_overlap_present
+
+## removing empty species names
+cys_met_overlap_present <- cys_met_overlap_present[cys_met_taxa_hits_spp != "", ] # simultaneously subsetting the feature table
+cys_met_taxa_hits_spp <- cys_met_taxa_hits_spp[cys_met_taxa_hits_spp != ""]
+dim(cys_met_overlap_present)
+length(cys_met_taxa_hits_spp)
+
+## removing Co-Abundance gene Groups (CAGs), GCAs (?), etc.
+if (length(grep("CAG", cys_met_taxa_hits_spp)) == 0) {
+  # do nothing
+} else if (length(grep("CAG", cys_met_taxa_hits_spp)) > 0) {
+  cys_met_overlap_present <- cys_met_overlap_present[-grep("CAG", cys_met_taxa_hits_spp), ]
+  cys_met_taxa_hits_spp <- cys_met_taxa_hits_spp[-grep("CAG", cys_met_taxa_hits_spp)]
+}
+dim(cys_met_overlap_present)
+length(cys_met_taxa_hits_spp)
+if (length(grep("GCA", cys_met_taxa_hits_spp)) == 0) {
+  # do nothing
+} else if (length(grep("GCA", cys_met_taxa_hits_spp)) > 0) {
+  cys_met_overlap_present <- cys_met_overlap_present[-grep("GCA", cys_met_taxa_hits_spp), ]
+  cys_met_taxa_hits_spp <- cys_met_taxa_hits_spp[-grep("GCA", cys_met_taxa_hits_spp)]
+}
+dim(cys_met_overlap_present)
+length(cys_met_taxa_hits_spp)
+if (length(grep("sp[0-9]*", cys_met_taxa_hits_spp)) == 0) {
+  # do nothing
+} else if (length(grep("sp[0-9]*", cys_met_taxa_hits_spp)) > 0) {
+  cys_met_overlap_present <- cys_met_overlap_present[-grep("sp[0-9]*", cys_met_taxa_hits_spp), ]
+  cys_met_taxa_hits_spp <- cys_met_taxa_hits_spp[-grep("sp[0-9]*", cys_met_taxa_hits_spp)]
+}
+dim(cys_met_overlap_present)
+length(cys_met_taxa_hits_spp)
+
+## subetting based on function hits (complicated for cys met)
+
+### cys degrading
+cys_taxa_hits_spp <- cys_met_taxa_hits_spp[cys_met_overlap_present$cysteine == 1]
+cys_overlap_present <- cys_met_overlap_present[cys_met_overlap_present$cysteine == 1, ]
+dim(cys_overlap_present)
+length(cys_taxa_hits_spp)
+#### removing oddities from names like "_A", "_X", etc.
+for (i in 1:length(cys_taxa_hits_spp)) {
+  current_name <- gsub("_[A-Z]{2}", "", cys_taxa_hits_spp[i])
+  current_name <- gsub("_[A-Z]_", "_", current_name)
+  current_name <- gsub("_[A-Z]", "", current_name)
+  # current_name <- gsub("_[A-Z]", "", cys_taxa_hits_spp[i])
+  cys_taxa_hits_spp[i] <- current_name
+}
+dim(cys_overlap_present)
+length(cys_taxa_hits_spp)
+
+#### removing "MGYG-HGUT" genomes
+cys_taxa_hits_spp <- cys_taxa_hits_spp[-grep("MGYG-HGUT", cys_taxa_hits_spp)]
+
+#### removing duplicates of species names
+cys_taxa_hits_spp <- unique(cys_taxa_hits_spp)
+print(paste("Number of cys bacteria compatable with metaphlan2 taxa names: ", length(cys_taxa_hits_spp)))
+
+### met degrading
+met_taxa_hits_spp <- cys_met_taxa_hits_spp[cys_met_overlap_present$methionine == 1]
+met_overlap_present <- cys_met_overlap_present[cys_met_overlap_present$methionine == 1, ]
+dim(met_overlap_present)
+length(met_taxa_hits_spp)
+#### removing oddities from names like "_A", "_X", etc.
+for (i in 1:length(met_taxa_hits_spp)) {
+  current_name <- gsub("_[A-Z]{2}_", "", met_taxa_hits_spp[i])
+  current_name <- gsub("_[A-Z]{2}", "", current_name)
+  current_name <- gsub("_[A-Z]_", "_", current_name)
+  current_name <- gsub("_[A-Z]", "", current_name)
+  # current_name <- gsub("_[A-Z]", "", cys_taxa_hits_spp[i])
+  met_taxa_hits_spp[i] <- current_name
+}
+dim(met_taxa_hits_spp)
+length(met_taxa_hits_spp)
+
+#### removing "MGYG-HGUT" genomes
+met_taxa_hits_spp <- met_taxa_hits_spp[-grep("MGYG-HGUT", met_taxa_hits_spp)]
+
+#### removing duplicates of species names
+met_taxa_hits_spp <- unique(met_taxa_hits_spp)
+print(paste("Number of met bacteria compatable with metaphlan2 taxa names: ", length(met_taxa_hits_spp)))
+
+### both degrading
+both_taxa_hits_spp <- cys_met_taxa_hits_spp[(cys_met_overlap_present$methionine == 1 & cys_met_overlap_present$cysteine == 1)]
+both_overlap_present <- cys_met_overlap_present[(cys_met_overlap_present$methionine == 1 & cys_met_overlap_present$cysteine == 1), ]
+dim(both_overlap_present)
+length(both_taxa_hits_spp)
+#### removing oddities from names like "_A", "_X", etc.
+for (i in 1:length(both_taxa_hits_spp)) {
+  current_name <- gsub("_[A-Z]{2}_", "", both_taxa_hits_spp[i])
+  current_name <- gsub("_[A-Z]{2}", "", current_name)
+  current_name <- gsub("_[A-Z]_", "_", current_name)
+  current_name <- gsub("_[A-Z]", "", current_name)
+  both_taxa_hits_spp[i] <- current_name
+}
+#### removing "MGYG-HGUT" genomes
+both_taxa_hits_spp <- both_taxa_hits_spp[-grep("MGYG-HGUT", both_taxa_hits_spp)]
+#### removing duplicates of species names
+both_taxa_hits_spp <- unique(both_taxa_hits_spp)
+print(paste("Number of cys_met bacteria compatable with metaphlan2 taxa names: ", length(both_taxa_hits_spp)))
+```
+
+dsr
+```{r}
+dsr_taxa_hits <- as.vector(t(dsr_taxa_hits_raw), mode = "character") # df -> vector
+dsr_taxa_hits <- strsplit(dsr_taxa_hits, ";")
+tmp <- unlist(dsr_taxa_hits)
+## extracting species names from taxa hits
+dsr_taxa_hits_spp <- vector(mode = "character", length = length(dsr_taxa_hits)) # create empty caracter vector
+for (i in 1:length(dsr_taxa_hits)) {
+  current_spp <- gsub(pattern = "s__", replacement = "", dsr_taxa_hits[[i]][7])
+  dsr_taxa_hits_spp[i] <- current_spp
+}
+
+## subetting feature table to non-absent representative genomes (contained in dsr_taxa_hits_raw)
+# filter(dsr_overlap, absent == 0) -> dsr_overlap_present
+
+### for use in debugging gutfunfind results for diss. sulf.
+# tmp_taxa <- dsr_taxa_hits[dsr_overlap_present$dsrAB == 1] ## NOTE: the version of `dsr_taxa_hits` required for this step
+#                                                           ## is the version outputted immediately after the _raw line
+# tmp_func <- filter(dsr_overlap_present, dsrAB == 1)
+# tmp_prob_genID <- tmp_func$genome[c(2,5,6,7,11,17,18,19,20,26)]
+# tmp_problem_taxa <- tmp_taxa[c(2,5,6,7,11,17,18,19,20,26)]
+# tmp_accep_genID <- tmp_func$genome[c(1,3,4,8,9,10,12,13,14,15,16,21,22,23,24,25,27)]
+# tmp_accepted_taxa <- tmp_taxa[c(1,3,4,8,9,10,12,13,14,15,16,21,22,23,24,25,27)]
+
+## removing empty species names
+dsr_overlap_ <- dsr_overlap[dsr_overlap$absent == 0, ]
+
+## removing Co-Abundance gene Groups (CAGs), GCAs (?), etc.
+if (length(grep("CAG", dsr_taxa_hits_spp)) == 0) {
+  # do nothing
+} else if (length(grep("CAG", dsr_taxa_hits_spp)) > 0) {
+  dsr_overlap_ <- dsr_overlap_[-grep("CAG", dsr_taxa_hits_spp), ]
+  dsr_taxa_hits_spp <- dsr_taxa_hits_spp[-grep("CAG", dsr_taxa_hits_spp)]
+}
+dim(dsr_overlap_)
+length(dsr_taxa_hits_spp)
+if (length(grep("GCA", dsr_taxa_hits_spp)) == 0) {
+  # do nothing
+} else if (length(grep("GCA", dsr_taxa_hits_spp)) > 0) {
+  dsr_overlap_ <- dsr_overlap_[-grep("GCA", dsr_taxa_hits_spp), ]
+  dsr_taxa_hits_spp <- dsr_taxa_hits_spp[-grep("GCA", dsr_taxa_hits_spp)]
+}
+dim(dsr_overlap_)
+length(dsr_taxa_hits_spp)
+if (length(grep("sp[0-9]*", dsr_taxa_hits_spp)) == 0) {
+  # do nothing
+} else if (length(grep("sp[0-9]*", dsr_taxa_hits_spp)) > 0) {
+  dsr_overlap_ <- dsr_overlap_[-grep("sp[0-9]*", dsr_taxa_hits_spp), ]
+  dsr_taxa_hits_spp <- dsr_taxa_hits_spp[-grep("sp[0-9]*", dsr_taxa_hits_spp)]
+}
+dim(dsr_overlap_)
+length(dsr_taxa_hits_spp)
+
+## subsetting based on function hits (for example, dsrAB must be present)
+`%notin%` <- Negate(`%in%`)
+dsr_taxa_hits_spp <- dsr_taxa_hits_spp[dsr_overlap_$dsrAB == 1]
+dsr_overlap_ <- dsr_overlap_[dsr_overlap_$dsrAB == 1, ]
+dim(dsr_overlap_)
+length(dsr_taxa_hits_spp)
+
+## removing genomes without specific species names
+dsr_taxa_hits_spp <- dsr_taxa_hits_spp[-grep("MGYG-HGUT", dsr_taxa_hits_spp)]
+print(paste("Number of dsr bacteria compatable with metaphlan2 taxa names: ", length(dsr_taxa_hits_spp)))
+```
+
+subsetting relative abundances 
+```{r}
+## CYSTEINE
+cys_indicies <- list(mode = "integer")
+for (i in 1:length(cys_taxa_hits_spp)) {
+  # cys_indicies[[i]] <- grep(cys_taxa_hits_spp[i], rownames(control_RA))
+  cys_indicies[[i]] <- grep(cys_taxa_hits_spp[i], rownames(metaphlan2_RA))
+}
+cys_indicies <- unlist(cys_indicies)
+cys_indicies <- unique(cys_indicies) # sanity check, no repeat rows
+
+# subsetting rel. abund. of cysteine deg bacteria
+cys_m2_RA_controls <- metaphlan2_RA_controls[cys_indicies, ]
+dim(cys_m2_RA_controls)
+
+# removing rows with __t in the taxa name... leading to double counting of RA
+cys_m2_RA_controls <- cys_m2_RA_controls[-grep("t__", rownames(cys_m2_RA_controls)), ]
+dim(cys_m2_RA_controls)
+
+# computing colSums and calculating XX% prevalance of cys. deg. bac.
+cys_m2_cs_controls <- colSums(cys_m2_RA_controls)
+cys_presnece_prop <- sum(cys_m2_cs_controls > 0) / length(cys_m2_cs_controls)
+print(paste0("Propotion of samples containing at least one met bacteria: ", cys_presnece_prop))
+
+## METHIONINE
+met_indicies <- list(mode = "integer")
+for (i in 1:length(met_taxa_hits_spp)) {
+  met_indicies[[i]] <- grep(met_taxa_hits_spp[i], rownames(metaphlan2_RA))
+}
+met_indicies <- unlist(met_indicies)
+met_indicies <- unique(met_indicies) # sanity check, no repeat rows
+
+# subsetting rel. abund. of cysteine deg bacteria
+met_m2_RA_controls <- metaphlan2_RA_controls[met_indicies, ]
+dim(met_m2_RA_controls)
+
+# removing rows with __t in the taxa name... leading to double counting of RA
+met_m2_RA_controls <- met_m2_RA_controls[-grep("t__", rownames(met_m2_RA_controls)), ]
+dim(met_m2_RA_controls)
+
+# computing colSums and calculating XX% prevalance of cys. deg. bac.
+met_m2_cs_controls <- colSums(met_m2_RA_controls)
+met_presnece_prop <- sum(met_m2_cs_controls > 0) / length(met_m2_cs_controls)
+print(paste0("Propotion of samples containing at least one met bacteria: ", met_presnece_prop))
+
+## BOTH (CYSTEINE AND METHIONINE)
+both_indicies <- list(mode = "integer")
+for (i in 1:length(both_taxa_hits_spp)) {
+  both_indicies[[i]] <- grep(both_taxa_hits_spp[i], rownames(metaphlan2_RA))
+}
+both_indicies <- unlist(both_indicies)
+both_indicies <- unique(both_indicies) # sanity check, no repeat rows
+
+# subsetting rel. abund. of cysteine deg bacteria
+cys_met_m2_RA_controls <- metaphlan2_RA_controls[both_indicies, ]
+dim(cys_met_m2_RA_controls)
+
+# removing rows with __t in the taxa name... leading to double counting of RA
+cys_met_m2_RA_controls <- cys_met_m2_RA_controls[-grep("t__", rownames(cys_met_m2_RA_controls)), ]
+dim(cys_met_m2_RA_controls)
+
+# computing colSums and calculating XX% prevalance of cys. deg. bac.
+cys_met_m2_cs_controls <- colSums(cys_met_m2_RA_controls)
+cys_met_presnece_prop <- sum(cys_met_m2_cs_controls > 0) / length(cys_met_m2_cs_controls)
+print(paste0("Propotion of samples containing at least one cys_met bacteria: ", cys_met_presnece_prop))
+
+## DSR INDICIES
+dsr_indicies <- list(mode = "integer")
+for (i in 1:length(dsr_taxa_hits_spp)) {
+  dsr_indicies[[i]] <- grep(dsr_taxa_hits_spp[i], rownames(metaphlan2_RA))
+}
+dsr_indicies <- unlist(dsr_indicies)
+dsr_indicies <- unique(dsr_indicies) # sanity check, no repeat rows
+
+# subsetting rel. abund. of cysteine deg bacteria
+dsr_m2_RA_controls <- metaphlan2_RA_controls[dsr_indicies, ]
+dim(dsr_m2_RA_controls)
+
+# removing rows with __t in the taxa name... leading to double counting of RA
+dsr_m2_RA_controls <- dsr_m2_RA_controls[-grep("t__", rownames(dsr_m2_RA_controls)), ]
+dim(dsr_m2_RA_controls)
+
+# computing colSums and calculating XX% prevalance of cys. deg. bac.
+dsr_m2_cs_controls <- colSums(dsr_m2_RA_controls)
+dsr_presnece_prop <- sum(dsr_m2_cs_controls > 0) / length(dsr_m2_cs_controls)
+print(paste0("Propotion of samples containing at least one SRB: ", dsr_presnece_prop))
 ```
 
 
 # Comparing abundance of SRB and Cys/Met Deg. Bacteria
 
-[X] - TODO: add columns for methionine degrading and both degrading
+Below is code for plotting the relative abundances of the various types of h2s producing bacteria from both the `kraken` RAs and the `metaphlan` RAs. At the moment (23 Nov 2020) it appears that we are likely going to go with the kraken values since a kraken DB has already been built for the UHGG representative genomes and it is impossible for us to build a metaphlan database for these genomes. 
+
+## Kraken2 control RAs
 
 ```{r}
 # prepping data for plotting
-df <- data.frame(cysteine = cys_deg_cs, # NOTE: these things are what are imortant for plots
-                 methionine = met_deg_cs,
-                 cys_met = both_deg_cs,
-                 dsr = dsr_cs
+df <- data.frame(cysteine = cys_k2_cs_controls, # NOTE: these things are what are imortant for plots
+                 methionine = met_k2_cs_controls,
+                 cys_met = cys_met_k2_cs_controls,
+                 dsr = dsr_k2_cs_controls
+                 )
+
+# plotting abundances of sulf(ai)te red bac and cys deg bac
+cys_met_dsr_healthy_RA <- ggplot(melt(df), aes(x = factor(variable), y = value, fill = factor(variable))) +
+  geom_violin() +
+  # geom_boxplot(outlier.alpha = 0.12) + #geom_jitter(aes(alpha = 0.001)) +
+  stat_summary(fun = median, geom = "point", shape = 1, size = 4) +
+  stat_summary(fun = mean, geom = "point", shape = 4, size = 4) +
+  scale_shape_manual("", values=c("mean" = "X")) +
+  scale_fill_manual(values = c("#FF0000", "#0000FF", "#7F0080", "#FD9409")) +
+  scale_y_continuous(limits = c(0.001, 100),
+                     breaks = c(0.01, 0.1, 1, 10, 100),  
+                     trans = "log2", 
+                     labels = label_comma(accuracy = 0.01)) +
+  ggtitle("Relative microbial abundances across H2S production pathways") +
+  ylab("relative microbial abundances, log2(%)") + labs(fill = "Function") + 
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        axis.title.y = element_text(size = 15),
+        plot.title = element_text(size = 15),
+        legend.position = "none") 
+cys_met_dsr_healthy_RA
+ggsave("../figures/figure2/k2_RAs_healthycontrols.svg", plot = cys_met_dsr_healthy_RA, width = 7, height = 7)
+ggsave("../figures/figure2/k2_RAs_healthycontrols.png", plot = cys_met_dsr_healthy_RA, width = 7, height = 7)
+```
+
+## MetaPhlAn2 control RAs
+
+```{r}
+## TODO: modify to work with metaphlan2 results (currently same as the kraken code)
+# prepping data for plotting
+df <- data.frame(cysteine = cys_m2_cs_controls, # NOTE: these things are what are imortant for plots
+                 methionine = met_m2_cs_controls,
+                 cys_met = cys_met_m2_cs_controls,
+                 dsr = dsr_m2_cs_controls
                  )
 
 # plotting abundances of sulf(ai)te red bac and cys deg bac
@@ -326,46 +579,308 @@ cys_met_dsr_healthy_RA <- ggplot(melt(df), aes(x = factor(variable), y = value, 
         plot.title = element_text(size = 15),
         legend.position = "none") 
 cys_met_dsr_healthy_RA
-ggsave("../figures/dsr_cys_and_met_healthy_abundances.svg", plot = cys_met_dsr_healthy_RA)
-
-
-# ## TESTING
-# data <- data.frame(v1 = rnorm(100), v2 = rnorm(100), v3 = rnorm(100), v4=rnorm(100))
-# library(reshape)
-# meltData <- melt(data)
-# ggplot(meltData, aes(factor(variable), value)) + 
-#   geom_boxplot() + facet_wrap(~variable, scale = "free")
-
+ggsave("../figures/figure2/m2_RAs_healthycontrols.svg", plot = cys_met_dsr_healthy_RA, width = 7, height = 7)
 ```
 
-## Comparing dsr, cys, met and cys_met RAs across at risk populations
+## Kraken2 risk RAs 
 
 This next figure will be the second major results figure of the paper and it will compare relative abundances of the 4 differnt classes of h2s producing bacteria across various at risk populations (IBD, CRC and (maybe) patients being treated with AR... this part doesnt matter as much as getting the plot started). 
 
+data processing
 ```{r}
-## setting function indicies
-cys_all_RA <- all_RA[cys_indicies, ]
-met_all_RA <- all_RA[met_indicies, ]
-cys_met_all_RA <- all_RA[both_indicies, ]
-dsr_all_RA <- all_RA[dsr_indicies, ]
-
-## removing rows with __t in the taxa name... leading to double counting of RA
-cys_all_RA <- cys_all_RA[-grep("t__", rownames(cys_all_RA)), ]
-cys_all_cs <- colSums(cys_all_RA)
-met_all_RA <- met_all_RA[-grep("t__", rownames(met_all_RA)), ]
-met_all_cs <- colSums(met_all_RA)
-cys_met_all_RA <- cys_met_all_RA[-grep("t__", rownames(cys_met_all_RA)), ]
-cys_met_all_cs <- colSums(cys_met_all_RA)
-dsr_all_RA <- dsr_all_RA[-grep("t__", rownames(dsr_all_RA)), ]
-dsr_all_cs <- colSums(dsr_all_RA)
+## calculating full column sums
+### cMD
+cys_k2_RA <- kraken2_RA[cys_taxa, ]
+cys_k2_cs <- colSums(cys_k2_RA)
+met_k2_RA <- kraken2_RA[met_taxa, ]
+met_k2_cs <- colSums(met_k2_RA)
+cys_met_k2_RA <- kraken2_RA[cys_met_taxa, ]
+cys_met_k2_cs <- colSums(cys_met_k2_RA)
+dsrAB_k2_RA <- kraken2_RA[dsrAB_taxa, ]
+dsrAB_k2_cs <- colSums(dsrAB_k2_RA)
+### hmp2
+cys_k2_hmp2_RA <- kraken2_hmp2_RA[cys_taxa, ]
+cys_k2_hmp2_cs <- colSums(cys_k2_hmp2_RA)
+met_k2_hmp2_RA <- kraken2_hmp2_RA[met_taxa, ]
+met_k2_hmp2_cs <- colSums(met_k2_hmp2_RA)
+cys_met_k2_hmp2_RA <- kraken2_hmp2_RA[cys_met_taxa, ]
+cys_met_k2_hmp2_cs <- colSums(cys_met_k2_hmp2_RA)
+dsrAB_k2_hmp2_RA <- kraken2_hmp2_RA[dsrAB_taxa, ]
+dsrAB_k2_hmp2_cs <- colSums(dsrAB_k2_hmp2_RA)
 
 ## filtering pData to only include populations for plotting
-all_pData %>%
+# kraken2_pData %>%
+#   filter(study_condition == c("IBD", "CRC", "control")) -> kraken_risk_pData
+kraken2_pData %>%
+  filter(study_condition == c("IBD", "CRC")) -> ibd_crc
+unique(ibd_crc$dataset_name) -> ibd_crc_studies
+kraken_risk_pData <- kraken2_pData[kraken2_pData$dataset_name %in% ibd_crc_studies, ]
+# kraken2_hmp2_pData ## already subsetted to risk populations
+### cMD
+cys_k2_cs_risk <- cys_k2_cs[names(cys_k2_cs) %in% rownames(kraken_risk_pData)]
+met_k2_cs_risk <- met_k2_cs[names(met_k2_cs) %in% rownames(kraken_risk_pData)]
+cys_met_k2_cs_risk <- cys_met_k2_cs[names(cys_met_k2_cs) %in% rownames(kraken_risk_pData)]
+dsrAB_k2_cs_risk <- dsrAB_k2_cs[names(dsrAB_k2_cs) %in% rownames(kraken_risk_pData)]
+### HMP2
+cys_k2_hmp2_cs_risk <- cys_k2_hmp2_cs[names(cys_k2_hmp2_cs) %in% kraken2_hmp2_pData$External.ID.mod]
+tmp <- kraken2_hmp2_pData[kraken2_hmp2_pData$External.ID.mod %in% names(cys_k2_hmp2_cs),]
+met_k2_hmp2_cs_risk <- met_k2_hmp2_cs[names(met_k2_hmp2_cs) %in% kraken2_hmp2_pData$External.ID.mod]
+cys_met_k2_hmp2_cs_risk <- cys_met_k2_hmp2_cs[names(cys_met_k2_hmp2_cs) %in% kraken2_hmp2_pData$External.ID.mod]
+dsrAB_k2_hmp2_cs_risk <- dsrAB_k2_hmp2_cs[names(dsrAB_k2_hmp2_cs) %in% kraken2_hmp2_pData$External.ID.mod]
+
+## making the necessary dataframes
+### cMD
+hmp2_study_cond <- as.character(kraken_risk_pData$study_condition)
+names(hmp2_study_cond) <- rownames(kraken_risk_pData)
+
+cys_k2_df <- as.data.frame(cbind(cys_k2_cs_risk, hmp2_study_cond = hmp2_study_cond[names(cys_k2_cs_risk)]))
+colnames(cys_k2_df) <- c("RA", "population")
+cys_k2_df$RA <- as.numeric(cys_k2_df$RA)
+cys_k2_df$func <- rep("cysteine", length(cys_k2_cs_risk))
+cys_k2_df$population <- factor(cys_k2_df$population, levels = c("control", "IBD", "adenoma", "CRC"))
+
+met_k2_df <- as.data.frame(cbind(met_k2_cs_risk, hmp2_study_cond = hmp2_study_cond[names(met_k2_cs_risk)]))
+colnames(met_k2_df) <- c("RA", "population")
+met_k2_df$RA <- as.numeric(met_k2_df$RA)
+met_k2_df$func <- rep("methionine", length(met_k2_cs_risk))
+met_k2_df$population <- factor(met_k2_df$population, levels = c("control", "IBD", "adenoma", "CRC"))
+
+cys_met_k2_df <- as.data.frame(cbind(cys_met_k2_cs_risk, hmp2_study_cond = hmp2_study_cond[names(cys_met_k2_cs_risk)]))
+colnames(cys_met_k2_df) <- c("RA", "population")
+cys_met_k2_df$RA <- as.numeric(cys_met_k2_df$RA)
+cys_met_k2_df$func <- rep("cys_met", length(cys_met_k2_cs_risk))
+cys_met_k2_df$population <- factor(cys_met_k2_df$population, levels = c("control", "IBD", "adenoma", "CRC"))
+
+dsrAB_k2_df <- as.data.frame(cbind(dsrAB_k2_cs_risk, hmp2_study_cond = hmp2_study_cond[names(dsrAB_k2_cs_risk)]))
+colnames(dsrAB_k2_df) <- c("RA", "population")
+dsrAB_k2_df$RA <- as.numeric(dsrAB_k2_df$RA)
+dsrAB_k2_df$func <- rep("dsrAB", length(dsrAB_k2_cs_risk))
+dsrAB_k2_df$population <- factor(dsrAB_k2_df$population, levels = c("control", "IBD", "adenoma", "CRC"))
+
+# cys_k2_df <- data.frame(func = rep("cysteine", length(cys_k2_cs_risk)), 
+#                  RA = cys_k2_cs_risk,
+#                  population = kraken_risk_pData$study_condition)
+# met_k2_df <- data.frame(func = rep("methionine", length(met_k2_cs_risk)), 
+#                  RA = met_k2_cs_risk,
+#                  population = kraken_risk_pData$study_condition)
+# cys_met_k2_df <- data.frame(func = rep("cys_and_met", length(cys_met_k2_cs_risk)), 
+#                  RA = cys_met_k2_cs_risk,
+#                  population = kraken_risk_pData$study_condition)
+# dsrAB_k2_df <- data.frame(func = rep("dsr", length(dsrAB_k2_cs_risk)), 
+#                  RA = dsrAB_k2_cs_risk,
+#                  population = kraken_risk_pData$study_condition)
+
+### HMP2
+subset_k2_pData <- select(kraken2_hmp2_pData, External.ID, diagnosis)
+k2_risk_pData <- subset_k2_pData$diagnosis
+names(k2_risk_pData) <- subset_k2_pData$External.ID
+
+cys_k2_hmp2_df <- as.data.frame(cbind(cys_k2_hmp2_cs_risk, k2_risk_pData = k2_risk_pData[names(cys_k2_hmp2_cs_risk)]))
+colnames(cys_k2_hmp2_df) <- c("RA", "diagnosis")
+cys_k2_hmp2_df$RA <- as.numeric(cys_k2_hmp2_df$RA)
+cys_k2_hmp2_df$func <- rep("cysteine", length(cys_k2_hmp2_cs_risk))
+cys_k2_hmp2_df$diagnosis <- factor(cys_k2_hmp2_df$diagnosis, levels = c("nonIBD", "UC", "CD"))
+# colnames(cys_k2_hmp2_df) <- c("RA", "diagnosis", "func")
+
+met_k2_hmp2_df <- as.data.frame(cbind(met_k2_hmp2_cs_risk, k2_risk_pData = k2_risk_pData[names(met_k2_hmp2_cs_risk)]))
+colnames(met_k2_hmp2_df) <- c("RA", "diagnosis")
+met_k2_hmp2_df$RA <- as.numeric(met_k2_hmp2_df$RA)
+met_k2_hmp2_df$func <- rep("methionine", length(met_k2_hmp2_cs_risk))
+met_k2_hmp2_df$diagnosis <- factor(met_k2_hmp2_df$diagnosis, levels = c("nonIBD", "UC", "CD"))
+# colnames(met_k2_hmp2_df) <- c("RA", "diagnosis", "func")
+
+cys_met_k2_hmp2_df <- as.data.frame(cbind(cys_met_k2_hmp2_cs_risk, k2_risk_pData = k2_risk_pData[names(cys_met_k2_hmp2_cs_risk)]))
+colnames(cys_met_k2_hmp2_df) <- c("RA", "diagnosis")
+cys_met_k2_hmp2_df$RA <- as.numeric(cys_met_k2_hmp2_df$RA)
+cys_met_k2_hmp2_df$func <- rep("cys_met", length(cys_met_k2_hmp2_cs_risk))
+cys_met_k2_hmp2_df$diagnosis <- factor(cys_met_k2_hmp2_df$diagnosis, levels = c("nonIBD", "UC", "CD"))
+# colnames(cys_met_k2_hmp2_df) <- c("RA", "diagnosis", "func")
+
+dsrAB_k2_hmp2_df <- as.data.frame(cbind(dsrAB_k2_hmp2_cs_risk, k2_risk_pData = k2_risk_pData[names(dsrAB_k2_hmp2_cs_risk)]))
+colnames(dsrAB_k2_hmp2_df) <- c("RA", "diagnosis")
+dsrAB_k2_hmp2_df$RA <- as.numeric(dsrAB_k2_hmp2_df$RA)
+dsrAB_k2_hmp2_df$func <- rep("dsrAB", length(dsrAB_k2_hmp2_cs_risk))
+dsrAB_k2_hmp2_df$diagnosis <- factor(dsrAB_k2_hmp2_df$diagnosis, levels = c("nonIBD", "UC", "CD"))
+# colnames(dsrAB_k2_hmp2_df) <- c("RA", "diagnosis", "func")
+
+# cys_k2_hmp2_df <- data.frame(func = rep("cysteine", length(cys_k2_hmp2_cs_risk)), 
+#                  RA = cys_k2_hmp2_cs_risk,
+#                  population = kraken2_hmp2_pData$diagnosis)
+# met_k2_hmp2_df <- data.frame(func = rep("methionine", length(met_k2_hmp2_cs_risk)), 
+#                  RA = met_k2_hmp2_cs_risk,
+#                  population = kraken2_hmp2_pData$diagnosis)
+# cys_met_k2_hmp2_df <- data.frame(func = rep("cys_and_met", length(cys_met_k2_hmp2_cs_risk)), 
+#                  RA = cys_met_k2_hmp2_cs_risk,
+#                  population = kraken2_hmp2_pData$diagnosis)
+# dsrAB_k2_hmp2_df <- data.frame(func = rep("dsr", length(dsrAB_k2_hmp2_cs_risk)), 
+#                  RA = dsrAB_k2_hmp2_cs_risk,
+#                  population = kraken2_hmp2_pData$diagnosis)
+```
+
+plotting data
+cMD
+```{r}
+clrs <- c("#999999", "#E69F00", "#56B4E9", "#0072B2")
+cys_k2_boxplot <- ggplot(cys_k2_df) + 
+  geom_boxplot(aes(x = func, y = RA, fill = population)) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  scale_y_continuous(limits = c(0.001, 100),
+                     breaks = c(0.01, 0.1, 1, 10, 100),
+                     trans = "log2",
+                     minor_breaks = NULL) +
+  scale_fill_manual(values = clrs) +
+  ylab("relative bacterial abundance, log2[%]") + xlab("")
+# cys_k2_boxplot
+met_k2_boxplot <- ggplot(met_k2_df) + 
+  geom_boxplot(aes(x = func, y = RA, fill = population)) +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.title.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank()) +
+  scale_y_continuous(limits = c(0.001, 100),
+                     breaks = c(0.01, 0.1, 1, 10, 100),
+                     trans = "log2", 
+                     minor_breaks = NULL) +
+  scale_fill_manual(values = clrs) +
+  xlab("")
+# met_k2_boxplot
+cys_met_k2_boxplot <- ggplot(cys_met_k2_df) + 
+  geom_boxplot(aes(x = func, y = RA, fill = population)) +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.title.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank()) +
+  scale_y_continuous(limits = c(0.001, 100),
+                     breaks = c(0.01, 0.1, 1, 10, 100),
+                     trans = "log2", 
+                     minor_breaks = NULL) +
+  scale_fill_manual(values = clrs) +
+  xlab("")
+# cys_met_k2_boxplot
+dsrAB_k2_boxplot <- ggplot(dsrAB_k2_df) + 
+  geom_boxplot(aes(x = func, y = RA, fill = population)) +
+  theme_bw() +
+  theme(axis.title.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank()) +
+  scale_y_continuous(limits = c(0.001, 100),
+                     breaks = c(0.01, 0.1, 1, 10, 100),
+                     trans = "log2", 
+                     minor_breaks = NULL) +
+  scale_fill_manual(values = clrs) +
+
+  xlab("")
+# dsrAB_k2_boxplot
+
+# =========================================================================== #
+
+## ARRANGING PLOTS 
+cys_k2_boxplot | met_k2_boxplot | cys_met_k2_boxplot | dsrAB_k2_boxplot
+ggsave("../figures/figure3/k2_RA_risk_populations.svg", height = 4, width = 7)
+ggsave("../figures/figure3/k2_RA_risk_populations.png", height = 4, width = 7)
+```
+
+hmp2
+```{r}
+# p <- ggplot(cys_k2_hmp2_df) + 
+#   geom_boxplot(aes(x = func, y = RA, fill = diagnosis))
+
+clrs <- c("#999999", "#F0E442", "#D55E00")
+cys_k2_hmp2_boxplot <- ggplot(cys_k2_hmp2_df) + 
+  geom_boxplot(aes(x = func, y = RA, fill = diagnosis)) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  scale_y_continuous(limits = c(0.001, 100),
+                     breaks = c(0.01, 0.1, 1, 10, 100),
+                     trans = "log2") +
+  scale_fill_manual(values = clrs) +
+  ylab("relative bacterial abundance, log2[%]") + xlab("")
+# cys_k2_hmp2_boxplot
+met_k2_hmp2_boxplot <- ggplot(met_k2_hmp2_df) + 
+  geom_boxplot(aes(x = func, y = RA, fill = diagnosis)) +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.title.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank()) +
+  scale_y_continuous(limits = c(0.001, 100),
+                     breaks = c(0.01, 0.1, 1, 10, 100),
+                     trans = "log2", 
+                     minor_breaks = NULL) +
+  scale_fill_manual(values = clrs) +
+  xlab("")
+# met_k2_hmp2_boxplot
+cys_met_k2_hmp2_boxplot <- ggplot(cys_met_k2_hmp2_df) + 
+  geom_boxplot(aes(x = func, y = RA, fill = diagnosis)) +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.title.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank()) +
+  scale_y_continuous(limits = c(0.001, 100),
+                     breaks = c(0.01, 0.1, 1, 10, 100),
+                     trans = "log2", 
+                     minor_breaks = NULL) +
+  scale_fill_manual(values = clrs) +
+  xlab("")
+# cys_met_k2_hmp2_boxplot
+dsrAB_k2_hmp2_boxplot <- ggplot(dsrAB_k2_hmp2_df) + 
+  geom_boxplot(aes(x = func, y = RA, fill = diagnosis)) +
+  theme_bw() +
+  theme(axis.title.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank()) +
+  scale_y_continuous(limits = c(0.001, 100),
+                     breaks = c(0.01, 0.1, 1, 10, 100),
+                     trans = "log2", 
+                     minor_breaks = NULL) +
+  scale_fill_manual(values = clrs) +
+
+  xlab("")
+# dsrAB_k2_hmp2_boxplot
+
+# =========================================================================== #
+
+## ARRANGING PLOTS 
+cys_k2_hmp2_boxplot | met_k2_hmp2_boxplot | cys_met_k2_hmp2_boxplot | dsrAB_k2_hmp2_boxplot
+ggsave("../figures/figure3/k2_hmp2_RA_risk_populations.svg", height = 4, width = 7)
+ggsave("../figures/figure3/k2_hmp2_RA_risk_populations.png", height = 4, width = 7)
+```
+
+## MetaPhlAn2 risk RAs
+
+data processing
+```{r}
+## setting function indicies
+cys_m2_RA <- metaphlan2_RA[cys_indicies, ]
+met_m2_RA <- metaphlan2_RA[met_indicies, ]
+cys_met_m2_RA <- metaphlan2_RA[both_indicies, ]
+dsr_m2_RA <- metaphlan2_RA[dsr_indicies, ]
+
+## removing rows with __t in the taxa name... leading to double counting of RA
+cys_m2_RA <- cys_m2_RA[-grep("t__", rownames(cys_m2_RA)), ]
+cys_m2_cs <- colSums(cys_m2_RA)
+met_m2_RA <- met_m2_RA[-grep("t__", rownames(met_m2_RA)), ]
+met_m2_cs <- colSums(met_m2_RA)
+cys_met_m2_RA <- cys_met_m2_RA[-grep("t__", rownames(cys_met_m2_RA)), ]
+cys_met_m2_cs <- colSums(cys_met_m2_RA)
+dsr_m2_RA <- dsr_m2_RA[-grep("t__", rownames(dsr_m2_RA)), ]
+dsr_m2_cs <- colSums(dsr_m2_RA)
+
+## filtering pData to only include populations for plotting
+metaphlan2_pData %>%
   filter(study_condition == c("IBD", "CRC", "control")) -> risk_pData
-cys_risk_cs <- cys_all_cs[names(cys_all_cs) %in% rownames(risk_pData)]
-met_risk_cs <- met_all_cs[names(met_all_cs) %in% rownames(risk_pData)]
-cys_met_risk_cs <- cys_met_all_cs[names(cys_met_all_cs) %in% rownames(risk_pData)]
-dsr_risk_cs <- dsr_all_cs[names(dsr_all_cs) %in% rownames(risk_pData)]
+cys_risk_cs <- cys_m2_cs[names(cys_m2_cs) %in% rownames(risk_pData)]
+met_risk_cs <- met_m2_cs[names(met_m2_cs) %in% rownames(risk_pData)]
+cys_met_risk_cs <- cys_met_m2_cs[names(cys_met_m2_cs) %in% rownames(risk_pData)]
+dsr_risk_cs <- dsr_m2_cs[names(dsr_m2_cs) %in% rownames(risk_pData)]
+# metaphlan2_pData %>%
+#   filter(study_condition == c("IBD", "CRC")) -> ibd_crc
+# unique(ibd_crc$studyID) -> ibd_crc_studies
+# ibd_crc_pData <- metaphlan2_pData[metaphlan2_pData$studyID %in% ibd_crc_studies, ]
 
 ## making the necessary dataframe
 cys_df <- data.frame(func = rep("cysteine", length(cys_risk_cs)), 
@@ -380,18 +895,9 @@ cys_met_df <- data.frame(func = rep("cys_and_met", length(cys_met_risk_cs)),
 dsr_df <- data.frame(func = rep("dsr", length(dsr_risk_cs)), 
                  RA = dsr_risk_cs,
                  population = risk_pData$study_condition)
-
-# =============================== KRAKEN DATA =============================== #
-
-## setting function indicies
-cys_k2_RA <- kraken2_RA[cys_indicies, ]
-met_all_RA <- all_RA[met_indicies, ]
-cys_met_all_RA <- all_RA[both_indicies, ]
-dsr_all_RA <- all_RA[dsr_indicies, ]
 ```
 
-The previous chunk is for prepping the dataframes to be plotted and the following chunk is for plotting said data.
-
+plotting data
 ```{r}
 clrs <- c("grey", "gold2", "green3")
 cys_boxplot <- ggplot(cys_df) + 
@@ -451,26 +957,13 @@ dsr_boxplot <- ggplot(dsr_df) +
 
 ## ARRANGING PLOTS 
 cys_boxplot | met_boxplot | cys_met_boxplot | dsr_boxplot
-ggsave("../figures/RA_across_risk_populations.png", height = 4, width = 7)
-
+ggsave("../figures/figure3/m2_RA_across_risk_populations.svg", height = 4, width = 7)
+ggsave("../figures/figure3/m2_RA_across_risk_populations.png", height = 4, width = 7)
 ```
 
+# Basement
 
-```{r}
-## TESTING
-
-ggplot(mpg) +
-    geom_bar(aes(x = class), fill = 'blue')
-
-ggplot(mpg) +
-    geom_bar(aes(x = class, fill = drv))
-
-ggplot(mpg) + 
-    geom_bar(aes(x = class, fill = factor(cyl)), position = position_dodge(preserve = 'single'))
-```
-
-
-# Attic
+contains depreciated code, but things that I want to keep around as reference to previous results and plots.
 
 ## Prevalence of sulfite reducing bacteria in healthy controls
 
