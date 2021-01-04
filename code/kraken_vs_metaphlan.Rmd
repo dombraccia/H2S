@@ -1,0 +1,34 @@
+---
+title: "Kraken vs MetaPhlAn Analysis"
+author: "Domenick J. Braccia"
+date: "11/16/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+
+```{r}
+
+```
+
+## Load data
+
+```{r}
+kraken2_counts <- readRDS("../data/from-xiaofang/kraken2_output.rds")
+kraken2_pData <- readRDS("../data/from-xiaofang/metadata.rds")
+metaphlan_RA <- readRDS("../data/all_RA.RDS")
+metaphlan_pData <- readRDS("../data/all_pData.RDS")
+```
+
+## Data processing
+
+```{r}
+
+```
+
+
+
