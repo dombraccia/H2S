@@ -5,8 +5,10 @@
 #' NOTE: it is assumed that all necessary packages and data are loaded into the 
 #' R session where this script is being run.
 # =========================================================================== #
-
+##### =================================================================== #####
 print("- calculating full column sums")
+##### =================================================================== #####
+
 ### cMD
 cys_k2_RA <- k2_RA[cys_taxa, ]
 cys_k2_cs <- colSums(cys_k2_RA)
@@ -17,8 +19,21 @@ cys_k2_hmp2_RA <- k2_hmp2_RA[cys_taxa, ]
 cys_k2_hmp2_cs <- colSums(cys_k2_hmp2_RA)
 dsrAB_k2_hmp2_RA <- k2_hmp2_RA[dsrAB_taxa, ]
 dsrAB_k2_hmp2_cs <- colSums(dsrAB_k2_hmp2_RA)
+### prism
+cys_k2_prism_RA <- k2_prism_RA[cys_taxa, ]
+cys_k2_prism_cs <- colSums(cys_k2_prism_RA)
+dsrAB_k2_prism_RA <- k2_prism_RA[dsrAB_taxa, ]
+dsrAB_k2_prism_cs <- colSums(dsrAB_k2_prism_RA)
+### CIB
+cys_k2_cib_RA <- k2_cib_RA[cys_taxa, ]
+cys_k2_cib_cs <- colSums(cys_k2_cib_RA)
+dsrAB_k2_cib_RA <- k2_cib_RA[dsrAB_taxa, ]
+dsrAB_k2_cib_cs <- colSums(dsrAB_k2_cib_RA)
 
+##### =================================================================== #####
 print("- filtering pData to only include populations for plotting")
+##### =================================================================== #####
+
 k2_pData %>%
   filter(study_condition == c("IBD", "CRC")) -> ibd_crc
 unique(ibd_crc$dataset_name) -> ibd_crc_studies
@@ -26,12 +41,21 @@ kraken_risk_pData <- k2_pData[k2_pData$dataset_name %in% ibd_crc_studies, ]
 ### cMD
 cys_k2_cs_risk <- cys_k2_cs[names(cys_k2_cs) %in% rownames(kraken_risk_pData)]
 dsrAB_k2_cs_risk <- dsrAB_k2_cs[names(dsrAB_k2_cs) %in% rownames(kraken_risk_pData)]
-### HMP2
+### hmp2
 cys_k2_hmp2_cs_risk <- cys_k2_hmp2_cs[names(cys_k2_hmp2_cs) %in% k2_hmp2_pData$External.ID]
-# tmp <- k2_hmp2_pData[k2_hmp2_pData$External.ID.mod %in% names(cys_k2_hmp2_cs),]
 dsrAB_k2_hmp2_cs_risk <- dsrAB_k2_hmp2_cs[names(dsrAB_k2_hmp2_cs) %in% k2_hmp2_pData$External.ID]
+### prism
+cys_k2_prism_cs_risk <- cys_k2_prism_cs[names(cys_k2_prism_cs) %in% k2_prism_pData$Sample]
+dsrAB_k2_prism_cs_risk <- dsrAB_k2_prism_cs[names(dsrAB_k2_prism_cs) %in% k2_prism_pData$Sample]
+### cib
+cys_k2_cib_cs_risk <- cys_k2_cib_cs[names(cys_k2_cib_cs) %in% k2_cib_pData$Sample_SRA]
+dsrAB_k2_cib_cs_risk <- dsrAB_k2_cib_cs[names(dsrAB_k2_cib_cs) %in% k2_cib_pData$Sample_SRA]
 
+
+##### =================================================================== #####
 print("- prepping dataframes for plotting")
+##### =================================================================== #####
+
 ### cMD
 hmp2_study_cond <- as.character(kraken_risk_pData$study_condition)
 names(hmp2_study_cond) <- rownames(kraken_risk_pData)
@@ -67,7 +91,45 @@ dsrAB_k2_hmp2_df$func <- rep("dsrAB", length(dsrAB_k2_hmp2_cs_risk))
 dsrAB_k2_hmp2_df$diagnosis <- factor(dsrAB_k2_hmp2_df$diagnosis, levels = c("nonIBD", "UC", "CD"))
 # colnames(dsrAB_k2_hmp2_df) <- c("RA", "diagnosis", "func")
 
+### prism
+subset_k2_prism_pData <- select(k2_prism_pData, Sample, Diagnosis)
+k2_prism_risk_pData <- subset_k2_prism_pData$Diagnosis
+names(k2_prism_risk_pData) <- subset_k2_prism_pData$Sample
+
+cys_k2_prism_df <- as.data.frame(cbind(cys_k2_prism_cs_risk, k2_prism_risk_pData = k2_prism_risk_pData[names(cys_k2_prism_cs_risk)]))
+colnames(cys_k2_prism_df) <- c("RA", "diagnosis")
+cys_k2_prism_df$RA <- as.numeric(cys_k2_prism_df$RA)
+cys_k2_prism_df$func <- rep("cysteine", length(cys_k2_prism_cs_risk))
+cys_k2_prism_df$diagnosis <- factor(cys_k2_prism_df$diagnosis, levels = c("HC", "UC", "CD"))
+
+dsrAB_k2_prism_df <- as.data.frame(cbind(dsrAB_k2_prism_cs_risk, k2_prism_risk_pData = k2_prism_risk_pData[names(dsrAB_k2_prism_cs_risk)]))
+colnames(dsrAB_k2_prism_df) <- c("RA", "diagnosis")
+dsrAB_k2_prism_df$RA <- as.numeric(dsrAB_k2_prism_df$RA)
+dsrAB_k2_prism_df$func <- rep("dsrAB", length(dsrAB_k2_prism_cs_risk))
+dsrAB_k2_prism_df$diagnosis <- factor(dsrAB_k2_prism_df$diagnosis, levels = c("HC", "UC", "CD"))
+
+### cib
+subset_k2_cib_pData <- select(k2_cib_pData, Sample_SRA, Diagnosis)
+k2_cib_risk_pData <- subset_k2_cib_pData$Diagnosis
+names(k2_cib_risk_pData) <- subset_k2_cib_pData$Sample
+
+cys_k2_prism_df <- as.data.frame(cbind(cys_k2_prism_cs_risk, k2_prism_risk_pData = k2_prism_risk_pData[names(cys_k2_prism_cs_risk)]))
+colnames(cys_k2_prism_df) <- c("RA", "diagnosis")
+cys_k2_prism_df$RA <- as.numeric(cys_k2_prism_df$RA)
+cys_k2_prism_df$func <- rep("cysteine", length(cys_k2_prism_cs_risk))
+cys_k2_prism_df$diagnosis <- factor(cys_k2_prism_df$diagnosis, levels = c("HC", "UC", "CD"))
+
+dsrAB_k2_prism_df <- as.data.frame(cbind(dsrAB_k2_prism_cs_risk, k2_prism_risk_pData = k2_prism_risk_pData[names(dsrAB_k2_prism_cs_risk)]))
+colnames(dsrAB_k2_prism_df) <- c("RA", "diagnosis")
+dsrAB_k2_prism_df$RA <- as.numeric(dsrAB_k2_prism_df$RA)
+dsrAB_k2_prism_df$func <- rep("dsrAB", length(dsrAB_k2_prism_cs_risk))
+dsrAB_k2_prism_df$diagnosis <- factor(dsrAB_k2_prism_df$diagnosis, levels = c("HC", "UC", "CD"))
+
+
+##### =================================================================== #####
 print("- plotting risk cMD sample data")
+##### =================================================================== #####
+
 clrs <- c("#999999", "#E69F00", "#56B4E9", "#0072B2")
 cys_k2_boxplot <- ggplot(cys_k2_df) + 
   geom_boxplot(aes(x = func, y = RA, fill = population)) +
@@ -97,14 +159,16 @@ dsrAB_k2_boxplot <- ggplot(dsrAB_k2_df) +
   xlab("sulfite_reducing")
 # dsrAB_k2_boxplot
 
+##### =================================================================== #####
 print("- arranging cMD plots")
+##### =================================================================== #####
 cys_k2_boxplot | dsrAB_k2_boxplot
 ggsave("../figures/figure3/k2_cMD_RA_risk_populations.svg", height = 7, width = 7)
 ggsave("../figures/figure3/k2_cMD_RA_risk_populations.png", height = 7, width = 7)
-
-# =========================================================================== #
-
+##### =================================================================== #####
 print("- plotting hmp2 data")
+##### =================================================================== #####
+
 clrs <- c("#999999", "#F0E442", "#D55E00")
 cys_k2_hmp2_boxplot <- ggplot(cys_k2_hmp2_df) + 
   geom_boxplot(aes(x = func, y = RA, fill = diagnosis)) +
@@ -132,10 +196,48 @@ dsrAB_k2_hmp2_boxplot <- ggplot(dsrAB_k2_hmp2_df) +
   scale_fill_manual(values = clrs) +
   xlab("sulfite_reducing")
 # dsrAB_k2_hmp2_boxplot
-
-# =========================================================================== #
-
+##### =================================================================== #####
 print("- arranging hmp2 plots")
+##### =================================================================== #####
+
 cys_k2_hmp2_boxplot | dsrAB_k2_hmp2_boxplot
 ggsave("../figures/figure3/k2_hmp2_RA_risk_populations.svg", height = 7, width = 7)
 ggsave("../figures/figure3/k2_hmp2_RA_risk_populations.png", height = 7, width = 7)
+##### =================================================================== #####
+print("- plotting prism data")
+##### =================================================================== #####
+
+clrs <- c("#999999", "#F0E442", "#D55E00")
+cys_k2_prism_boxplot <- ggplot(cys_k2_prism_df) + 
+  geom_boxplot(aes(x = func, y = RA, fill = diagnosis)) +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.text.x = element_blank()) +
+  scale_y_continuous(limits = c(0.001, 100),
+                     breaks = c(0.01, 0.1, 1, 10, 100),
+                     trans = "log2") +
+  scale_fill_manual(values = clrs) +
+  ylab("relative bacterial abundance, log2[%]") + xlab("cysteine_degrading")
+cys_k2_prism_boxplot
+
+dsrAB_k2_prism_boxplot <- ggplot(dsrAB_k2_prism_df) + 
+  geom_boxplot(aes(x = func, y = RA, fill = diagnosis)) +
+  theme_bw() +
+  theme(axis.title.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_blank()) +
+  scale_y_continuous(limits = c(0.001, 100),
+                     breaks = c(0.01, 0.1, 1, 10, 100),
+                     trans = "log2", 
+                     minor_breaks = NULL) +
+  scale_fill_manual(values = clrs) +
+  xlab("sulfite_reducing")
+dsrAB_k2_prism_boxplot
+##### =================================================================== #####
+print("- arranging prism plots")
+##### =================================================================== #####
+
+cys_k2_prism_boxplot | dsrAB_k2_prism_boxplot
+ggsave("../figures/figure3/k2_prism_RA_risk_populations.svg", height = 7, width = 7)
+ggsave("../figures/figure3/k2_prism_RA_risk_populations.png", height = 7, width = 7)

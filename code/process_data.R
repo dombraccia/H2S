@@ -28,16 +28,15 @@ k2_hmp2_pData <- read.csv("../data/from-xiaofang/hmp2_metadata.MGX.csv",
 k2_hmppilot_counts <- read.csv("../data/from-xiaofang/HMP-IBD-pilot.mpa.txt", 
                                sep = "\t", header = TRUE)
 k2_prism_counts <- read.csv("../data/from-xiaofang/merged.mpa.txt", 
-                            sep = "\t", header = TRUE)
-prism_metadata_combined <- read.csv(
-  file = "../data/prism_combined_metadata_20201209.txt")
-## loading prism medatada # NOTE: not sure why this is conmmented out atm
-# prism_metadata <- read.csv("../data/metadata-prism.txt", sep = "\t", header = TRUE)
-# prism_extra_metadata <- read.csv("../data/from-brantley/metadata_PRISM_NLIBD", header = TRUE)
-# colnames(prism_extra_metadata)[3] <- "LibraryName"
-# prism_combined_metadata <- merge(prism_metadata, prism_extra_metadata, by = "LibraryName")
-# write.table(prism_combined_metadata, file = "../data/prism_combined_metadata_20201209.txt", quote = FALSE, sep = "\t", row.names = FALSE)
-## all code above was for making the combined metadata file
+                            sep = "\t", header = TRUE, row.names = 1) %>%
+                          as.matrix()
+k2_prism_pData <- read.csv("../data/prism_combined_metadata_20201209.txt", 
+                           sep = "\t", header = TRUE)
+k2_cib_counts <- read.csv("../data/from-xiaofang/cib.mpa.txt", 
+                          sep = "\t", row.names = 1) %>% 
+                          as.matrix()
+k2_cib_pData <- read.csv("../data/from-xiaofang/cib_metadata.tsv",
+                         sep = "\t")
 
 # ============================ METAPHLAN2 DATA ============================== #
 print("- processing metaphlan RA data")
@@ -61,7 +60,7 @@ m2_RA <- m2_RA[, !is.na(m2_pData$study_condition)]
 m2_RA_controls <- m2_RA[, colnames(m2_RA) %in% rownames(m2_pData_controls)]
 
 # =============================== KRAKEN DATA =============================== #
-print("- processing kraken RA data")
+print("- processing kraken RA data (hmp2)")
 ## computing RA values from count info
 k2_counts_spp <- k2_counts[grep("s__", rownames(k2_counts)), ]
 k2_RA <- prop.table(k2_counts_spp, 2) * 100 ## counts -> RA (%)
@@ -81,3 +80,27 @@ k2_hmp2_pData <- k2_hmp2_pData[-grep("_", k2_hmp2_pData$External.ID), ]
 
 ## modifying k2_hmp2_pData$External.ID column for compatability with RA
 # k2_hmp2_pData$External.ID.mod <- sapply(strsplit(k2_hmp2_pData$External.ID, "_"), "[", 1)
+
+# =========================================================================== #
+
+print("- processing kraken RA data (hmp2)")
+## computing RA values from count info
+k2_prism_counts_spp <- k2_prism_counts[grep("s__", rownames(k2_prism_counts)), ]
+k2_prism_RA <- prop.table(k2_prism_counts_spp, 2) * 100 ## counts -> RA (%)
+k2_prism_counts_spp <-  k2_prism_counts_spp[grep("s__", rownames(k2_prism_counts_spp)), ]
+k2_prism_RA <- prop.table(as.matrix(k2_prism_counts_spp), 2) * 100 ## counts -> RA (%)
+
+
+#### ===================================================================== ####
+print("- processing kraken RA data (cib)")
+#### ===================================================================== ####
+
+## computing RA values from count info
+k2_cib_counts_spp <- k2_cib_counts[grep("s__", rownames(k2_cib_counts)), ]
+k2_cib_RA <- prop.table(k2_cib_counts_spp, 2) * 100 ## counts -> RA (%)
+k2_cib_counts_spp <-  k2_cib_counts_spp[grep("s__", rownames(k2_cib_counts_spp)), ]
+k2_cib_RA <- prop.table(as.matrix(k2_cib_counts_spp), 2) * 100 ## counts -> RA (%)
+
+## remove pData samples not present in counts
+k2_cib_pData <- k2_cib_pData[k2_cib_pData$Sample_SRA %in% colnames(k2_cib_RA), ]
+

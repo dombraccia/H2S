@@ -64,5 +64,6 @@ cys_met_dsr_healthy_RA
 source("risk_relative_abundances.R")
 cys_k2_boxplot | dsrAB_k2_boxplot
 cys_k2_hmp2_boxplot | dsrAB_k2_hmp2_boxplot
+cys_k2_prism_boxplot | dsrAB_k2_prism_boxplot
 ```
 
