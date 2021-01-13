@@ -15,5 +15,5 @@ for file in $readfiles; do
 	outfile=$(echo $file | cut -d '/' -f 3 | cut -d '.' -f 1)
 	echo "--- writing to output file: $outdir/$outfile.m8"
 	external/diamond blastx --db $db -q $file -o $outdir/$outfile.m8 \
-		-b42.0 -c1 # better performance 
+		-b42.0 -c1 # better performance (need node w 500gb of memory)
 done
