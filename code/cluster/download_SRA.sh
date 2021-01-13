@@ -8,15 +8,16 @@
 ##### =================================================================== #####
 
 echo "- initializing variables"
-sampleID=$(cat $1)
-echo "-- TEST: sampleID = $sampleID"
+sampleIDs=$(cut -d , -f 1 $1)
 dummy_outfile=$2
 
 echo "- running fasterq-dump"
-external/sratoolkit.2.10.9-ubuntu64/bin/fasterq-dump $sampleID \
-	-x \
-	--temp data/from-SRA/tmp \
-	-O data/from-SRA/
+for sample in $sampleIDs; do
+	external/sratoolkit.2.10.9-ubuntu64/bin/fasterq-dump $sample -S \
+		-x \
+		--temp data/david-2014/tmp \
+		-O data/david-2014/
+done
 
 echo "- writing to dummy file"
 echo "finished downloading raw transcriptomics data." >> $dummy_outfile

@@ -4,9 +4,9 @@
 #SBATCH -o logs/snake_%j.o # output file
 #SBATCH -e logs/snake_%j.e # error file
 #SBATCH --mail-type=fail,end # Get email for begin, end, and fail
-#SBATCH --qos=xlarge
-#SBATCH --time=12:00:00
-#SBATCH --mem=500gb
+#SBATCH --qos=throughput
+#SBATCH --time=18:00:00
+#SBATCH --mem=36gb
 
 # SCRIPT FOR RUNNING SNAKEMAKE SCRIPTS ON CLUSTER
 
