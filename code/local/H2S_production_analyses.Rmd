@@ -67,3 +67,9 @@ cys_k2_hmp2_boxplot | dsrAB_k2_hmp2_boxplot
 cys_k2_prism_boxplot | dsrAB_k2_prism_boxplot
 ```
 
+## Transcriptomic Analysis
+
+```{r}
+source("gene_expression.R")
+```
+
