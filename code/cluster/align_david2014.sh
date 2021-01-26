@@ -5,7 +5,7 @@
 echo "- initializing variables"
 db=$1
 outdir=$2
-# echo "-- TEST: outdir = $outdir"
+echo "-- TEST: outdir = $outdir"
 mkdir -p $outdir
 readfiles=data/david-2014/*.fastq
 
