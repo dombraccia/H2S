@@ -40,13 +40,13 @@ upset plot for each cys degrading gene
 ## NOTE: only way to save this plot is by knitting the doc and clicking saveas on the figure
 source("upset.R")
 upset(cys_dsr_overlap, 
-      sets = c(new_gene_names, "dsrAB"), 
+      sets = colnames(cys_dsr_overlap)[-1], 
       order.by = "freq", decreasing = TRUE,
       matrix.color = c("grey23"), point.size = 2,
-      sets.bar.color = c(rep("#dd9e2f", 7), "#1c6bc9", rep("#dd9e2f", 2)),
-      main.bar.color = c(rep("#dd9e2f", 6), "#1c6bc9", rep("#dd9e2f", 23)),
+      sets.bar.color = c(rep("#dd9e2f", 4), "#1c6bc9", rep("#dd9e2f", 1)),
+      main.bar.color = c(rep("#dd9e2f", 3), "#1c6bc9", rep("#dd9e2f", 9)),
       text.scale = 1,
-      mainbar.y.label = "Number of species with gene") 
+      mainbar.y.label = "Number of hits to genomes in UHGG") 
 ```
 
 ## cys degredation vs. DSR in healthy controls
@@ -62,14 +62,24 @@ cys_met_dsr_healthy_RA
 
 ```{r, message=FALSE, warning=FALSE}
 source("risk_relative_abundances.R")
-cys_k2_boxplot | dsrAB_k2_boxplot
-cys_k2_hmp2_boxplot | dsrAB_k2_hmp2_boxplot
-cys_k2_prism_boxplot | dsrAB_k2_prism_boxplot
+(cys_k2_boxplot | dsrAB_k2_boxplot) +
+  plot_annotation(title = "curatedMetagneomicData (52 studies)",
+                  theme = theme(plot.title = element_text(size = 18)))
+(cys_k2_hmp2_boxplot | dsrAB_k2_hmp2_boxplot) +
+  plot_annotation(title = "HMP2",
+                  theme = theme(plot.title = element_text(size = 18)))
+(cys_k2_prism_boxplot | dsrAB_k2_prism_boxplot) +
+  plot_annotation(title = "PRISM",
+                  theme = theme(plot.title = element_text(size = 18)))
+(cys_k2_cib_boxplot | dsrAB_k2_cib_boxplot) +
+  plot_annotation(title = "Pediatric Crohn's (Lewis et. al 2015)",
+                  theme = theme(plot.title = element_text(size = 22)))
 ```
 
 ## Transcriptomic Analysis
 
 ```{r}
 source("gene_expression.R")
+baseline_boxplot | plant_boxplot | animal_boxplot
 ```
 

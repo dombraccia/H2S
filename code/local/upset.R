@@ -6,7 +6,7 @@
 # =========================================================================== #
 
 ## loading in cys degrading gene genome containment
-cys_genes <- read.table("../results/from-GutFunFind/Cysteine_Degradation.genes.tsv")
+cys_genes <- read.table("../../results/from-GutFunFind/Cysteine_Degradation.genes.tsv")
 colnames(cys_genes) <- c("genome", "genes")
 gene_names <- c("sseA", "mccA", "metB", "dycD", 
                 "fn0625", "fn1055", "fn1220", "fn1419", "mgl")
@@ -16,17 +16,24 @@ cys_genes <- mutate(cys_genes, sseA = 0, mccA = 0, metB = 0, dycD = 0,
 #                     MGL_0625 = 0, MGL_1055 = 0, MGL_1220 = 0, MGL_1419 = 0, MGL = 0)
 for (i in 1:dim(cys_genes)[1]) {
   current_genes <- strsplit(cys_genes[i, "genes"], ",")
-  for (j in 1:length(current_genes[[1]])) {
-    if ("absent" %in% current_genes) {break}
-    cys_genes[i, current_genes[[1]][j]] <- 1
+  gene_table <- table(current_genes)
+  for (j in 1:length(gene_table)) {
+    if ("absent" %in% names(current_genes)) {break}
+    cys_genes[i, names(gene_table)[j]] <- gene_table[j]
   }
 }
+cys_genes <- cys_genes[, -12] # removing "absent" column
 new_gene_names <- c("MST", "CBS", "CSE", "CYD",
                 "MGL_0625", "MGL_1055", "MGL_1220", "MGL_1419", "MGL")
 colnames(cys_genes) <- c("genome", "genes", new_gene_names)
 
+## condensing columns of cys_genes
+cys_genes <- cys_genes %>%
+  mutate(MGL = MGL + MGL_0625 + MGL_1055 + MGL_1220 + MGL_1419,
+         .keep = c("unused"))
+
 ## loading dsrAB gene containment
-dsr_feature <- read.table("../results/from-GutFunFind/Dissimilatory_Sulf_Reduction.feature.tsv")
+dsr_feature <- read.table("../../results/from-GutFunFind/Dissimilatory_Sulf_Reduction.feature.tsv")
 colnames(dsr_feature) <- c("genome", "func")
 dsr_feature %>% 
   mutate(absent = ifelse(func == "absent", 1, 0),
@@ -35,5 +42,9 @@ dsr_feature %>%
          dsrAB = ifelse(func == "dsrAB", 1, 0)) %>%
   select(genome, absent, dsrA, dsrB, dsrAB) -> dsr_overlap
 
-## TODO: combine "absent" columns from both cys met deg and diss sulf red
-cys_dsr_overlap <- cbind(cys_genes[, -2], dsrAB = dsr_overlap$dsrAB) 
+## combining cys and dsrAB gene hits
+cys_dsr_overlap <- cbind(cys_genes[, -2], dsrAB = dsr_overlap$dsrAB)
+
+## replacing all values > 1 with 1. This makes upset plot simpler
+cys_dsr_overlap[-1][cys_dsr_overlap[-1] != 0] <- 1
+

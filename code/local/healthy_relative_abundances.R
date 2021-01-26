@@ -8,12 +8,12 @@
 
 print("- importing taxa hit information and feature information")
 dsr_taxa_hits_raw <- read.csv(
-  file = "../results/from-GutFunFind/Dissimilatory_Sulf_Reduction.taxa_hits.txt", 
+  file = "../../results/from-GutFunFind/Dissimilatory_Sulf_Reduction.taxa_hits.txt", 
   sep = "\t", header = FALSE)
 cys_taxa_hits_raw <- read.csv(
-  file = "../results/from-GutFunFind/Cysteine_Degradation.taxa_hits.txt", 
+  file = "../../results/from-GutFunFind/Cysteine_Degradation.taxa_hits.txt", 
   sep = "\t", header = FALSE)
-uhgg_genid2taxa <- read.csv("../data/from-xiaofang/spec.txt", sep = '\t', header = FALSE)
+uhgg_genid2taxa <- read.csv("../../data/from-xiaofang/spec.txt", sep = '\t', header = FALSE)
 uhgg_genid2taxa$V2 <- gsub(";", "|", uhgg_genid2taxa$V2)
 
 dsr_taxa_hits <- as.vector(t(dsr_taxa_hits_raw), mode = "character") 
@@ -41,8 +41,14 @@ cys_k2_RA_controls <- k2_RA_controls[cys_taxa, ]
 cys_k2_cs_controls <- colSums(cys_k2_RA_controls)
 
 ## prepping data for plotting
-df <- data.frame(cysteine_degrading = cys_k2_cs_controls,
-                 sulfite_reducing = dsr_k2_cs_controls)
+df <- data.frame(PCDB = cys_k2_cs_controls,
+                 SRB = dsr_k2_cs_controls)
+
+## calculating p-values comparing relative abundance between PCDB and SRB
+cMD_healthy_k2_PCDB_SRB <- 
+  wilcox.test(df$cysteine_degrading, 
+              df$sulfite_reducing)
+cMD_healthy_k2_PCDB_SRB
 
 print("- plotting abundances of sulfite red bac and cys deg bac")
 cys_met_dsr_healthy_RA <- ggplot(melt(df), aes(x = factor(variable), y = value, fill = factor(variable))) +
@@ -68,7 +74,7 @@ cys_met_dsr_healthy_RA <- ggplot(melt(df), aes(x = factor(variable), y = value, 
         plot.title = element_blank(),
         legend.position = "none") 
 cys_met_dsr_healthy_RA
-ggsave("../figures/figure2/k2_RAs_healthycontrols.svg", 
+ggsave("../../figures/figure2/k2_RAs_healthycontrols.svg", 
        plot = cys_met_dsr_healthy_RA, width = 5, height = 7)
-ggsave("../figures/figure2/k2_RAs_healthycontrols.png", 
+ggsave("../../figures/figure2/k2_RAs_healthycontrols.png", 
        plot = cys_met_dsr_healthy_RA, width = 5, height = 7)

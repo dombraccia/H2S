@@ -8,35 +8,36 @@
 # ========================= cMD DATA (Metaphlan) ============================ #
 
 print("- loading in saved cMD data (metaphlan RA)")
-if(file.exists("../data/all_data.RDS")) {
-  m2_data <- readRDS("../data/all_data.RDS")
+if(file.exists("../../data/all_data.RDS")) {
+  m2_data <- readRDS("../../data/all_data.RDS")
 } else {
   tic()
   m2_data <- curatedMetagenomicData("*metaphlan_bugs_list.stool*", dryrun = FALSE)
-  saveRDS(all_data, file = "../data/all_data.RDS")
+  saveRDS(all_data, file = "../../data/all_data.RDS")
   toc()
 }
 
 # ====================== kraken2 data from Xiaofang ========================= #
 print("- loading kraken2 RA from Xiaofang")
-k2_counts <- readRDS("../data/from-xiaofang/kraken2_output.rds")
-k2_pData <- readRDS("../data/from-xiaofang/metadata.rds")
-k2_hmp2_counts <- read.csv("../data/from-xiaofang/HMP2-IBD.mpa.txt", 
+k2_counts <- readRDS("../../data/from-xiaofang/kraken2_output.rds")
+k2_pData <- readRDS("../../data/from-xiaofang/metadata.rds")
+k2_hmp2_counts <- read.csv("../../data/from-xiaofang/HMP2-IBD.mpa.txt", 
                            sep = "\t", header = TRUE, row.names = 1)
-k2_hmp2_pData <- read.csv("../data/from-xiaofang/hmp2_metadata.MGX.csv", 
+k2_hmp2_pData <- read.csv("../../data/from-xiaofang/hmp2_metadata.MGX.csv", 
                           header = TRUE) # NOTE: `diagnosis` column contains study condition information.
-k2_hmppilot_counts <- read.csv("../data/from-xiaofang/HMP-IBD-pilot.mpa.txt", 
+k2_hmppilot_counts <- read.csv("../../data/from-xiaofang/HMP-IBD-pilot.mpa.txt", 
                                sep = "\t", header = TRUE)
-k2_prism_counts <- read.csv("../data/from-xiaofang/merged.mpa.txt", 
+k2_prism_counts <- read.csv("../../data/from-xiaofang/merged.mpa.txt", 
                             sep = "\t", header = TRUE, row.names = 1) %>%
                           as.matrix()
-k2_prism_pData <- read.csv("../data/prism_combined_metadata_20201209.txt", 
+k2_prism_pData <- read.csv("../../data/prism_combined_metadata_20201209.txt", 
                            sep = "\t", header = TRUE)
-k2_cib_counts <- read.csv("../data/from-xiaofang/cib.mpa.txt", 
+k2_cib_counts <- read.csv("../../data/from-xiaofang/cib.mpa.txt", 
                           sep = "\t", row.names = 1) %>% 
                           as.matrix()
-k2_cib_pData <- read.csv("../data/from-xiaofang/cib_metadata.tsv",
+k2_cib_pData <- read.csv("../../data/from-xiaofang/cib_metadata.tsv",
                          sep = "\t")
+k2_cib_metadata <- read.csv("../../data/from-xiaofang/SraRunTable.txt")
 
 # ============================ METAPHLAN2 DATA ============================== #
 print("- processing metaphlan RA data")
