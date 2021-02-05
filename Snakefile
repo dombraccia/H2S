@@ -22,7 +22,7 @@ rule align:
 rule process_diamond:
 	input: directory("results/diamond_out/{function}")
 	output: directory("results/diamond_processed/{function}")
-	shell: "code/cluster/process_diamond_CH4_producing.sh {input} {output}"
+	shell: "code/cluster/process_diamond_H2S_producing.sh {input} {output}"
 
 ## BASEMENT: where I keep potentially unuseful rules
 rule fastp:
