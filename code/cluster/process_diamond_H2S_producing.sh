@@ -49,6 +49,16 @@ for sample in $samples; do
 	decR_count+=$(cat $read2 | grep -o "decR" | wc -l)
 	declare -i iscS_count; iscS_count=$(cat $read1 | grep -o "iscS" | wc -l)
 	iscS_count+=$(cat $read2 | grep -o "iscS" | wc -l)
+
+	declare -i fn0625_count; fn0625_count=$(cat $read1 | grep -o "fn0625" | wc -l)
+	fn0625_count+=$(cat $read2 | grep -o "fn0625" | wc -l)
+	declare -i fn1055_count; fn1055_count=$(cat $read1 | grep -o "fn1055" | wc -l)
+	fn1055_count+=$(cat $read2 | grep -o "fn1055" | wc -l)
+	declare -i fn1220_count; fn1220_count=$(cat $read1 | grep -o "fn1220" | wc -l)
+	fn1220_count+=$(cat $read2 | grep -o "fn1220" | wc -l)
+	declare -i fn1419_count; fn1419_count=$(cat $read1 | grep -o "fn1419" | wc -l)
+	fn1419_count+=$(cat $read2 | grep -o "fn1419" | wc -l)
+
 	declare -i mgl_count; mgl_count=$(cat $read1 | grep -o "mgl" | wc -l)
 	mgl_count+=$(cat $read2 | grep -o "mgl" | wc -l)
 	declare -i tnaA_count; tnaA_count=$(cat $read1 | grep -o "tnaA" | wc -l)
@@ -60,15 +70,17 @@ for sample in $samples; do
 	
 	if [ $loop_count == 1 ]; then
 		printf "%b" "Run\t" "mst\t" "cse\t" "cbs\t" "cyd\t" "metC\t" "cysM\t" \
-		"cysK\t" "malY\t" "yhaO\t" "yhaM\t" "decR\t" "iscS\t" "mgl\t" "tnaA\t" \
-		"dsrA\t" "dsrB\n" >> $diamond_processed/counts.tsv
+		"cysK\t" "malY\t" "yhaO\t" "yhaM\t" "decR\t" "iscS\t" "fn0625\t" "fn1055\t" \
+		"fn1220\t" "fn1419\t" "mgl\t" "tnaA\t" "dsrA\t" "dsrB\n" \
+		>> $diamond_processed/counts.tsv
 	fi
 
 	## writing counts to tsv
 	printf "%b" "$sample\t" "$mst_count\t" "$cse_count\t" "$cbs_count\t" \
 		"$cyd_count\t" "$metC_count\t" "$cysM_count\t" "$cysK_count\t" "$malY_count\t" \
-		"$yhaO_count\t" "$yhaM_count\t" "$decR_count\t" "$iscS_count\t" "$mgl_count\t" \
-		"$tnaA_count\t" "$dsrA_count\t" "$dsrB_count\n" \
+		"$yhaO_count\t" "$yhaM_count\t" "$decR_count\t" "$iscS_count\t" "$fn0625_count\t" \
+		"$fn1055_count\t" "$fn1220_count\t" "$fn1419_count\t" "$mgl_count\t" "$tnaA_count\t" \
+		"$dsrA_count\t" "$dsrB_count\n" \
 		>> $diamond_processed/counts.tsv
 	
 	(( loop_count++ ))
