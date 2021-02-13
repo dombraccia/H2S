@@ -46,8 +46,8 @@ df <- data.frame(PCDB = cys_k2_cs_controls,
 
 ## calculating p-values comparing relative abundance between PCDB and SRB
 cMD_healthy_k2_PCDB_SRB <- 
-  wilcox.test(df$cysteine_degrading, 
-              df$sulfite_reducing)
+  wilcox.test(df$PCDB, 
+              df$SRB)
 cMD_healthy_k2_PCDB_SRB
 
 print("- plotting abundances of sulfite red bac and cys deg bac")
@@ -67,14 +67,16 @@ cys_met_dsr_healthy_RA <- ggplot(melt(df), aes(x = factor(variable), y = value, 
   theme_bw() +
   theme(axis.title.x = element_blank(),
         axis.ticks.x = element_blank(),
-        axis.text.x = element_text(size = 13),
-        axis.text.y = element_text(size = 13),
-        axis.title.y = element_text(size = 13),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        axis.title.y = element_text(size = 15),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
         # plot.title = element_text(size = 14),
         plot.title = element_blank(),
         legend.position = "none") 
 cys_met_dsr_healthy_RA
-ggsave("../../figures/figure2/k2_RAs_healthycontrols.svg", 
-       plot = cys_met_dsr_healthy_RA, width = 5, height = 7)
-ggsave("../../figures/figure2/k2_RAs_healthycontrols.png", 
-       plot = cys_met_dsr_healthy_RA, width = 5, height = 7)
+ggsave("../../figures/figure3/k2_RAs_healthycontrols.svg", 
+       plot = cys_met_dsr_healthy_RA, width = 6, height = 7)
+ggsave("../../figures/figure3/k2_RAs_healthycontrols.png", 
+       plot = cys_met_dsr_healthy_RA, width = 6, height = 7)

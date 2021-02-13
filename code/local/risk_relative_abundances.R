@@ -179,8 +179,8 @@ cys_k2_boxplot <- ggplot(cys_k2_df) +
   theme_bw() +
   theme(legend.position = "none",
         axis.text.x = element_blank(),
-        axis.title.x = element_text(size = 16),
-        axis.title.y = element_text(size = 16)) +
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8)) +
   scale_y_continuous(limits = c(0.001, 100),
                      breaks = c(0.01, 0.1, 1, 10, 100),
                      trans = "log2",
@@ -192,18 +192,21 @@ cys_k2_boxplot <- ggplot(cys_k2_df) +
 dsrAB_k2_boxplot <- ggplot(dsrAB_k2_df) + 
   geom_boxplot(aes(x = func, y = RA, fill = population)) +
   theme_bw() +
-  theme(axis.title.y = element_blank(),
+  theme(legend.title = element_text(size = 8),
+        legend.text = element_text(size = 6),
+        legend.key.size = unit(0.3, "cm"),
+        axis.title.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.text.y = element_blank(),
         axis.text.x = element_blank(),
-        axis.title.x = element_text(size = 16)) +
+        axis.title.x = element_text(size = 8)) +
   scale_y_continuous(limits = c(0.001, 100),
                      breaks = c(0.01, 0.1, 1, 10, 100),
                      trans = "log2", 
                      minor_breaks = NULL) +
   scale_fill_manual(values = clrs) +
   xlab("SRB")
-# dsrAB_k2_boxplot
+dsrAB_k2_boxplot
 
 ##### =================================================================== #####
 print("- arranging cMD plots")
@@ -211,8 +214,8 @@ print("- arranging cMD plots")
 (cys_k2_boxplot | dsrAB_k2_boxplot) +
   plot_annotation(title = "curatedMetagneomicData",
                   theme = theme(plot.title = element_text(size = 22)))
-ggsave("../../figures/figure4/k2_cMD_RA_risk_populations.svg", height = 7, width = 7)
-ggsave("../../figures/figure4/k2_cMD_RA_risk_populations.png", height = 7, width = 7)
+# ggsave("../../figures/figure4/k2_cMD_RA_risk_populations.svg", height = 7, width = 7)
+# ggsave("../../figures/figure4/k2_cMD_RA_risk_populations.png", height = 7, width = 7)
 ##### =================================================================== #####
 print("- plotting hmp2 data")
 ##### =================================================================== #####
@@ -223,8 +226,9 @@ cys_k2_hmp2_boxplot <- ggplot(cys_k2_hmp2_df) +
   theme_bw() +
   theme(legend.position = "none",
         axis.text.x = element_blank(),
-        axis.title.x = element_text(size = 16),
-        axis.title.y = element_text(size = 16)) +
+        panel.grid.minor.y = element_blank(),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8)) +
   scale_y_continuous(limits = c(0.001, 100),
                      breaks = c(0.01, 0.1, 1, 10, 100),
                      trans = "log2") +
@@ -235,11 +239,14 @@ cys_k2_hmp2_boxplot <- ggplot(cys_k2_hmp2_df) +
 dsrAB_k2_hmp2_boxplot <- ggplot(dsrAB_k2_hmp2_df) + 
   geom_boxplot(aes(x = func, y = RA, fill = diagnosis)) +
   theme_bw() +
-  theme(axis.title.y = element_blank(),
+  theme(legend.title = element_text(size = 8),
+        legend.text = element_text(size = 6),
+        axis.title.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.text.y = element_blank(),
         axis.text.x = element_blank(),
-        axis.title.x = element_text(size = 16)) +
+        panel.grid.minor.y = element_blank(),
+        axis.title.x = element_text(size = 8)) +
   scale_y_continuous(limits = c(0.001, 100),
                      breaks = c(0.01, 0.1, 1, 10, 100),
                      trans = "log2", 
@@ -254,8 +261,8 @@ print("- arranging hmp2 plots")
 (cys_k2_hmp2_boxplot | dsrAB_k2_hmp2_boxplot) +
   plot_annotation(title = "HMP2",
                   theme = theme(plot.title = element_text(size = 22)))
-ggsave("../../figures/figure4/k2_hmp2_RA_risk_populations.svg", height = 7, width = 7)
-ggsave("../../figures/figure4/k2_hmp2_RA_risk_populations.png", height = 7, width = 7)
+# ggsave("../../figures/figure4/k2_hmp2_RA_risk_populations.svg", height = 7, width = 7)
+# ggsave("../../figures/figure4/k2_hmp2_RA_risk_populations.png", height = 7, width = 7)
 ##### =================================================================== #####
 print("- plotting prism data")
 ##### =================================================================== #####
@@ -266,8 +273,9 @@ cys_k2_prism_boxplot <- ggplot(cys_k2_prism_df) +
   theme_bw() +
   theme(legend.position = "none",
         axis.text.x = element_blank(),
-        axis.title.x = element_text(size = 16),
-        axis.title.y = element_text(size = 16)) +
+        panel.grid.minor.y = element_blank(),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8)) +
   scale_y_continuous(limits = c(0.001, 100),
                      breaks = c(0.01, 0.1, 1, 10, 100),
                      trans = "log2") +
@@ -278,11 +286,13 @@ cys_k2_prism_boxplot <- ggplot(cys_k2_prism_df) +
 dsrAB_k2_prism_boxplot <- ggplot(dsrAB_k2_prism_df) + 
   geom_boxplot(aes(x = func, y = RA, fill = diagnosis)) +
   theme_bw() +
-  theme(axis.title.y = element_blank(),
+  theme(legend.title = element_text(size = 8),
+        legend.text = element_text(size = 6),
+        axis.title.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.text.y = element_blank(),
         axis.text.x = element_blank(),
-        axis.title.x = element_text(size = 16)) +
+        axis.title.x = element_text(size = 8)) +
   scale_y_continuous(limits = c(0.001, 100),
                      breaks = c(0.01, 0.1, 1, 10, 100),
                      trans = "log2", 
@@ -297,8 +307,8 @@ print("- arranging prism plots")
 (cys_k2_prism_boxplot | dsrAB_k2_prism_boxplot) +
   plot_annotation(title = "PRISM",
                   theme = theme(plot.title = element_text(size = 22)))
-ggsave("../../figures/figure4/k2_prism_RA_risk_populations.svg", height = 7, width = 7)
-ggsave("../../figures/figure4/k2_prism_RA_risk_populations.png", height = 7, width = 7)
+# ggsave("../../figures/figure4/k2_prism_RA_risk_populations.svg", height = 7, width = 7)
+# ggsave("../../figures/figure4/k2_prism_RA_risk_populations.png", height = 7, width = 7)
 
 ##### =================================================================== #####
 print("- plotting cib data")
@@ -310,8 +320,9 @@ cys_k2_cib_boxplot <- ggplot(cys_k2_cib_df) +
   theme_bw() +
   theme(legend.position = "none",
         axis.text.x = element_blank(),
-        axis.title.x = element_text(size = 16),
-        axis.title.y = element_text(size = 16)) +
+        panel.grid.minor.y = element_blank(),
+        axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8)) +
   scale_y_continuous(limits = c(0.001, 100),
                      breaks = c(0.01, 0.1, 1, 10, 100),
                      trans = "log2") +
@@ -322,11 +333,13 @@ cys_k2_cib_boxplot <- ggplot(cys_k2_cib_df) +
 dsrAB_k2_cib_boxplot <- ggplot(dsrAB_k2_cib_df) + 
   geom_boxplot(aes(x = func, y = RA, fill = diagnosis)) +
   theme_bw() +
-  theme(axis.title.y = element_blank(),
+  theme(legend.title = element_text(size = 8),
+        legend.text = element_text(size = 6),
+        axis.title.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.text.y = element_blank(),
         axis.text.x = element_blank(),
-        axis.title.x = element_text(size = 16)) +
+        axis.title.x = element_text(size = 8)) +
   scale_y_continuous(limits = c(0.001, 100),
                      breaks = c(0.01, 0.1, 1, 10, 100),
                      trans = "log2", 
@@ -341,6 +354,6 @@ print("- arranging cib plots")
 (cys_k2_cib_boxplot | dsrAB_k2_cib_boxplot) +
   plot_annotation(title = "Pediatric Crohn's (Lewis et. al 2015)",
                   theme = theme(plot.title = element_text(size = 22)))
-ggsave("../../figures/figure4/k2_cib_RA_risk_populations.svg", height = 7, width = 7)
-ggsave("../../figures/figure4/k2_cib_RA_risk_populations.png", height = 7, width = 7)
+# ggsave("../../figures/figure4/k2_cib_RA_risk_populations.svg", height = 7, width = 7)
+# ggsave("../../figures/figure4/k2_cib_RA_risk_populations.png", height = 7, width = 7)
 

@@ -10,17 +10,63 @@
 
 
 #### ======================== loading in data =========================== #####
-print("- loading and processing data")
+print("- loading and processing H2S data")
 
-## count data
-counts_raw <- read.csv("../../results/diamond_processed/counts.tsv", 
+## H2S count data
+counts_raw_H2S <- read.csv("../../results/diamond_processed/H2S_producing/counts.tsv", 
          sep = "\t", header = TRUE)
-rnames <- counts_raw$Run
-counts <- t(counts_raw[, 2:8])
-colnames(counts) <- rnames
+rnames <- counts_raw_H2S$Run
+counts_H2S <- t(counts_raw_H2S[, 2:21])
+colnames(counts_H2S) <- rnames
 
-## metadata
-metadata <- read.csv("../../data/david-2014/metadata.txt", header = TRUE)
+## CH4 count data
+counts_raw_CH4 <- read.csv("../../results/diamond_processed/CH4_producing/counts.tsv", 
+                           sep = "\t", header = TRUE)
+rnames_CH4 <- counts_raw_CH4$Run
+counts_CH4 <- t(counts_raw_CH4[, 2:21])
+colnames(counts_CH4) <- rnames_CH4
+
+## sample metadata
+metadata <- read.csv("../../data/david-2014/SraRunTable.txt", header = TRUE)
+extra_metadata <- read.csv("../../data/from-xiaofang/cib_metadata.tsv", 
+                           sep = "\t", header = TRUE)
+
+#### ==================================================================== #####
+
+#### ======================== normalizing counts ======================== #####
+
+print("- normalizing counts to RPK -> TPM")
+
+## getting length of genes in kb
+H2S_aa_seqs <- read.fasta("../../data/from-uniprot/H2S_producing_enzymes.fa", seqtype = "AA")
+CH4_aa_seqs <- read.fasta("../../data/from-uniprot/CH4_producing_enzymes.fa", seqtype = "AA")
+
+## calculating gene lengths (*3 AA->DNA, /1000 per kilobase)
+H2S_seq_len_raw <- sapply(H2S_aa_seqs, length) * 3 / 1000 
+CH4_aa_seq_lengths <- sapply(CH4_aa_seqs, length) * 3 / 1000 
+
+## averaging lengths for H2S producing genes (for some genes, multiple 
+## homologues were downloaded and included in the search space)
+H2S_aa_seq_lengths <- vector("numeric", length = 20)
+H2S_aa_seq_lengths[1] <- mean(H2S_seq_len_raw[1:4])
+H2S_aa_seq_lengths[2:16] <- H2S_seq_len_raw[5:19]
+H2S_aa_seq_lengths[17] <- mean(H2S_seq_len_raw[20:21])
+H2S_aa_seq_lengths[18:20] <- H2S_seq_len_raw[22:24]
+
+
+## scaling raw counts to rpkm
+trc_raw <- read.csv("../../data/david-2014/sample_read_counts.tsv",
+                sep = "\t", header = FALSE)
+colnames(trc_raw) <- c("Run", "num_reads")
+trc <- trc_raw$num_reads / 1e6
+names(trc) <- trc_raw$Run
+norm_counts_H2S <- sweep(counts_H2S, 2, trc, FUN = '/')
+norm_counts_CH4 <- sweep(counts_CH4, 2, trc, FUN = '/')
+
+## converting read number normalized counts to RPKM
+RPKM_H2S <- sweep(norm_counts_H2S, 1, H2S_aa_seq_lengths, FUN = '/')
+RPKM_CH4 <- sweep(norm_counts_CH4, 1, CH4_aa_seq_lengths, FUN = '/')
+
 
 #### ==================================================================== #####
 
@@ -34,58 +80,85 @@ metadata %>% filter(Time > 0, diet == "plant-based") -> plant_metadata
 metadata %>% filter(Time > 0, diet == "animal-based") -> animal_metadata
 
 ## prepping baseline data
-baseline_counts <- counts[, colnames(counts) %in% baseline_metadata$Run]
-baseline_df <- melt(baseline_counts)
-colnames(baseline_df) <- c("genes", "Run", "counts")
-# baseline_df$counts <- log2(as.numeric(baseline_df$counts))
-# baseline_df$counts[!is.finite(baseline_df$counts)] <- 0
-baseline_df$genes <- factor(baseline_df$genes, 
-                            levels =  c("MST", "CYD", "CBS", "CSE", 
-                                        "MGL", "dsrA", "dsrB"))
+baseline_counts_H2S <- RPKM_H2S[, colnames(RPKM_H2S) %in% baseline_metadata$Run]
+baseline_df_H2S <- melt(baseline_counts_H2S)
+colnames(baseline_df_H2S) <- c("genes", "Run", "counts")
+baseline_df_H2S$genes <- factor(baseline_df_H2S$genes, 
+    levels =  c("mst", "cse", "cbs", "cyd", "metC", "cysM", "cysK",  "malY", "yhaO", "yhaM",
+                "decR", "iscS", "fn0625", "fn1055", "fn1220", "fn1419", "mgl", "tnaA", "dsrA", "dsrB"))
 
-plant_counts <- counts[, colnames(counts) %in% plant_metadata$Run]
-plant_df <- melt(plant_counts)
-colnames(plant_df) <- c("genes", "Run", "counts")
-# plant_df$counts <- log2(as.numeric(plant_df$counts))
-# plant_df$counts[!is.finite(plant_df$counts)] <- 0
-plant_df$genes <- factor(plant_df$genes, 
-                            levels =  c("MST", "CYD", "CBS", "CSE", 
-                                        "MGL", "dsrA", "dsrB"))
+plant_counts_H2S <- RPKM_H2S[, colnames(RPKM_H2S) %in% plant_metadata$Run]
+plant_df_H2S <- melt(plant_counts_H2S)
+colnames(plant_df_H2S) <- c("genes", "Run", "counts")
+plant_df_H2S$genes <- factor(plant_df_H2S$genes, 
+    levels =  c("mst", "cse", "cbs", "cyd", "metC", "cysM", "cysK",  "malY", "yhaO", "yhaM",
+                "decR", "iscS", "fn0625", "fn1055", "fn1220", "fn1419", "mgl", "tnaA", "dsrA", "dsrB"))
 
-animal_counts <- counts[, colnames(counts) %in% animal_metadata$Run]
-animal_df <- melt(animal_counts)
-colnames(animal_df) <- c("genes", "Run", "counts")
-# animal_df$counts <- log2(as.numeric(animal_df$counts))
-# animal_df$counts[!is.finite(animal_df$counts)] <- 0
-animal_df$genes <- factor(animal_df$genes, 
-                            levels =  c("MST", "CYD", "CBS", "CSE", 
-                                        "MGL", "dsrA", "dsrB"))
+animal_counts_H2S <- RPKM_H2S[, colnames(RPKM_H2S) %in% animal_metadata$Run]
+animal_df_H2S <- melt(animal_counts_H2S)
+colnames(animal_df_H2S) <- c("genes", "Run", "counts")
+animal_df_H2S$genes <- factor(animal_df_H2S$genes, 
+    levels =  c("mst", "cse", "cbs", "cyd", "metC", "cysM", "cysK",  "malY", "yhaO", "yhaM",
+                "decR", "iscS", "fn0625", "fn1055", "fn1220", "fn1419", "mgl", "tnaA", "dsrA", "dsrB"))
+
+#### ==================================================================== #####
+
+#### ========================== CH4 PRODUCTION =========================== ####
+
+print("- processing CH4 data")
+
+## prepping baseline data
+baseline_counts_CH4 <- RPKM_CH4[, colnames(RPKM_CH4) %in% baseline_metadata$Run]
+baseline_df_CH4 <- melt(baseline_counts_CH4)
+colnames(baseline_df_CH4) <- c("genes", "Run", "counts")
+baseline_df_CH4$genes <- factor(baseline_df_CH4$genes, 
+                                levels =  c("fwdA", "fwdB", "fwdD", "fwdE", "fwdF", "fwdG",
+                                            "Ftr", "Hmd", "Mch", "mcrA", "mcrB", "mcrG", "Mer", 
+                                            "mtrA", "mtrB", "mtrC", "mtrD", "mtrE", "mtrF", "mtrG"))
+
+plant_counts_CH4 <- RPKM_CH4[, colnames(RPKM_CH4) %in% plant_metadata$Run]
+plant_df_CH4 <- melt(plant_counts_CH4)
+colnames(plant_df_CH4) <- c("genes", "Run", "counts")
+plant_df_CH4$genes <- factor(plant_df_CH4$genes, 
+                             levels =  c("fwdA", "fwdB", "fwdD", "fwdE", "fwdF", "fwdG",
+                                         "Ftr", "Hmd", "Mch", "mcrA", "mcrB", "mcrG", "Mer", 
+                                         "mtrA", "mtrB", "mtrC", "mtrD", "mtrE", "mtrF", "mtrG"))
+
+animal_counts_CH4 <- RPKM_CH4[, colnames(RPKM_CH4) %in% animal_metadata$Run]
+animal_df_CH4 <- melt(animal_counts_CH4)
+colnames(animal_df_CH4) <- c("genes", "Run", "counts")
+animal_df_CH4$genes <- factor(animal_df_CH4$genes, 
+                              levels =  c("fwdA", "fwdB", "fwdD", "fwdE", "fwdF", "fwdG",
+                                          "Ftr", "Hmd", "Mch", "mcrA", "mcrB", "mcrG", "Mer", 
+                                          "mtrA", "mtrB", "mtrC", "mtrD", "mtrE", "mtrF", "mtrG"))
 
 #### ==================================================================== #####
 
 #### ============================ plotting ============================== #####
-print("- plotting data")
+print("- plotting H2S plots")
 
 ## baseline boxplot
-baseline_boxplot <- ggplot(data = baseline_df, aes(x = genes, fill = genes, y = counts)) +
-  geom_boxplot(outlier.shape = NA) + geom_jitter(alpha = 0.8, size = 0.4, width = 0.2) + 
+# baseline_df_H2S$counts <- baseline_df_H2S$counts + 1 
+baseline_boxplot_H2S <- ggplot(data = baseline_df_H2S, aes(x = genes, fill = genes, y = counts)) +
+  geom_boxplot(outlier.shape = NA) + 
+  # geom_jitter(alpha = 0.8, size = 0.4, width = 0.2) + 
   theme_bw() +
   theme(legend.position = "none",
         axis.text.x = element_blank(),
         axis.ticks.x = element_blank(),
         axis.title.x = element_text(size = 16),
         axis.title.y = element_text(size = 16)) +
-  scale_y_continuous(limits = c(1, 6000), 
-                     breaks = c(1, 10, 100, 1000, 5000),
-                     trans = "log2",
+  scale_y_continuous(limits = c(0, 20), 
+                     # breaks = c(1, 10, 100, 1000, 5000),
+                     #trans = "log2",
                      minor_breaks = NULL) +
-  scale_fill_manual(values = c("#d3411a", "#d85b1d", "#dd9e2f", "#e2c137", 
-                               "#ebf268", "#1f97c1", "#1e5bc6")) +
-  xlab("baseline") + ylab("Reads mapped per gene (raw counts)")
+  xlab("baseline") + ylab("RPKM")
+baseline_boxplot_H2S
 
 ## plant boxplot
-plant_boxplot <- ggplot(data = plant_df, aes(x = genes, fill = genes, y = counts)) +
-  geom_boxplot(outlier.shape = NA) + geom_jitter(alpha = 0.8, size = 0.4, width = 0.2) +
+plant_boxplot_H2S <- ggplot(data = plant_df_H2S, aes(x = genes, fill = genes, y = counts)) +
+  geom_boxplot(outlier.shape = NA) + 
+  # geom_jitter(alpha = 0.8, size = 0.4, width = 0.2) +
   theme_bw() +
   theme(legend.position = "none",
         axis.title.y = element_blank(),
@@ -94,17 +167,16 @@ plant_boxplot <- ggplot(data = plant_df, aes(x = genes, fill = genes, y = counts
         axis.ticks.x = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.x = element_text(size = 16)) +
-  scale_y_continuous(limits = c(1, 6000), 
-                     breaks = c(1, 10, 100, 1000, 5000),
-                     trans = "log2",
+  scale_y_continuous(limits = c(0, 20), 
+                     # breaks = c(1, 10, 100, 1000, 5000),
+                     #trans = "log2",
                      minor_breaks = NULL) +
-  scale_fill_manual(values = c("#d3411a", "#d85b1d", "#dd9e2f", "#e2c137", 
-                               "#ebf268", "#1f97c1", "#1e5bc6")) +
   xlab("plant-based")
 
 ## animal boxplot
-animal_boxplot <- ggplot(data = animal_df, aes(x = genes, fill = genes, y = counts)) +
-  geom_boxplot(outlier.shape = NA) + geom_jitter(alpha = 0.8, size = 0.4, width = 0.2) +
+animal_boxplot_H2S <- ggplot(data = animal_df_H2S, aes(x = genes, fill = genes, y = counts)) +
+  geom_boxplot(outlier.shape = NA) + 
+  # geom_jitter(alpha = 0.8, size = 0.4, width = 0.2) +
   theme_bw() +
   theme(axis.title.y = element_blank(),
         axis.text.y = element_blank(),
@@ -112,16 +184,68 @@ animal_boxplot <- ggplot(data = animal_df, aes(x = genes, fill = genes, y = coun
         axis.ticks.x = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.x = element_text(size = 16)) +
-  scale_y_continuous(limits = c(1, 6000), 
-                     breaks = c(1, 10, 100, 1000, 5000),
-                     trans = "log2",
+  scale_y_continuous(limits = c(0, 20), 
+                     # breaks = c(1, 10, 100, 1000, 5000),
+                     #trans = "log2",
                      minor_breaks = NULL) +
-  scale_fill_manual(values = c("#d3411a", "#d85b1d", "#dd9e2f", "#e2c137", 
-                               "#ebf268", "#1f97c1", "#1e5bc6")) +
   xlab("animal-based")
 
-baseline_boxplot | plant_boxplot | animal_boxplot
-ggsave("../../figures/supplementary/david2014_RNAseq_diet.svg", height = 7, width = 10)
-ggsave("../../figures/supplementary/david2014_RNAseq_diet.png", height = 7, width = 10)
+baseline_boxplot_H2S | plant_boxplot_H2S | animal_boxplot_H2S
+ggsave("../../figures/supplementary/david2014_RNAseq_diet_H2S_genes.svg", height = 7, width = 10)
+ggsave("../../figures/supplementary/david2014_RNAseq_diet_H2S_genes.png", height = 7, width = 10)
 #### ==================================================================== #####
 
+#### ========================== plotting CH4 ============================ #####
+print("- plotting CH4 data")
+
+## baseline boxplot
+baseline_boxplot_CH4 <- ggplot(data = baseline_df_CH4, aes(x = genes, fill = genes, y = counts)) +
+  geom_boxplot(outlier.shape = NA) + 
+  # geom_jitter(alpha = 0.8, size = 0.4, width = 0.2) + 
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16)) +
+  scale_y_continuous(limits = c(0, 5), 
+                     #trans = "log2",
+                     minor_breaks = NULL) +
+  xlab("baseline") + ylab("RPKM")
+
+## plant boxplot
+plant_boxplot_CH4 <- ggplot(data = plant_df_CH4, aes(x = genes, fill = genes, y = counts)) +
+  geom_boxplot(outlier.shape = NA) + 
+  # geom_jitter(alpha = 0.8, size = 0.4, width = 0.2) +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.title.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.x = element_text(size = 16)) +
+  scale_y_continuous(limits = c(0, 5),
+                     #trans = "log2",
+                     minor_breaks = NULL) +
+  xlab("plant-based")
+
+## animal boxplot
+animal_boxplot_CH4 <- ggplot(data = animal_df_CH4, aes(x = genes, fill = genes, y = counts)) +
+  geom_boxplot(outlier.shape = NA) + 
+  # geom_jitter(alpha = 0.8, size = 0.4, width = 0.2) +
+  theme_bw() +
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.x = element_text(size = 16)) +
+  scale_y_continuous(limits = c(0, 5),
+                     #trans = "log2",
+                     minor_breaks = NULL) +
+  xlab("animal-based")
+
+baseline_boxplot_CH4 | plant_boxplot_CH4 | animal_boxplot_CH4
+ggsave("../../figures/supplementary/david2014_RNAseq_diet_CH4_genes.svg", height = 7, width = 10)
+ggsave("../../figures/supplementary/david2014_RNAseq_diet_CH4_genes.png", height = 7, width = 10)
