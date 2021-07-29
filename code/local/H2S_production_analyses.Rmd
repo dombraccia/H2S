@@ -24,11 +24,14 @@ library(cowplot)
 library(svglite)
 library(scales)
 library(reshape)
+library(seqinr)
+library(ggforce)
 ```
 
 ## Loading and Processing Data
 
 ```{r}
+setwd("/Users/dome/Desktop/UMD/hall-pop-lab/H2S/code/local")
 source("process_data.R")
 ```
 
@@ -43,11 +46,19 @@ upset(cys_dsr_overlap,
       sets = colnames(cys_dsr_overlap)[-1], 
       order.by = "freq", decreasing = TRUE,
       matrix.color = c("grey23"), point.size = 2,
-      sets.bar.color = c(rep("#dd9e2f", 4), "#1c6bc9", rep("#dd9e2f", 1)),
-      main.bar.color = c(rep("#dd9e2f", 3), "#1c6bc9", rep("#dd9e2f", 9)),
-      text.scale = 1,
-      mainbar.y.label = "Number of hits to genomes in UHGG") 
+      sets.bar.color = c(rep("#dd9e2f", 15), "#1c6bc9", rep("#dd9e2f", 3)),
+      main.bar.color = c(rep("#dd9e2f", 6), "#1c6bc9", rep("#dd9e2f", 33)),
+      text.scale = 0.8,
+      mainbar.y.label = "Number of UHGG genomes with gene(s)") 
 ```
+
+## Taxa Hit Table
+
+```{r}
+source("gene_hits.table.R")
+gene_hits
+```
+
 
 ## cys degredation vs. DSR in healthy controls
 
@@ -62,24 +73,47 @@ cys_met_dsr_healthy_RA
 
 ```{r, message=FALSE, warning=FALSE}
 source("risk_relative_abundances.R")
-(cys_k2_boxplot | dsrAB_k2_boxplot) +
+p1 <- (cys_k2_boxplot | dsrAB_k2_boxplot) +
   plot_annotation(title = "curatedMetagneomicData (52 studies)",
-                  theme = theme(plot.title = element_text(size = 18)))
-(cys_k2_hmp2_boxplot | dsrAB_k2_hmp2_boxplot) +
+                  theme = theme(plot.title = element_text(size = 10)))
+p2 <- (cys_k2_hmp2_boxplot | dsrAB_k2_hmp2_boxplot) +
   plot_annotation(title = "HMP2",
-                  theme = theme(plot.title = element_text(size = 18)))
-(cys_k2_prism_boxplot | dsrAB_k2_prism_boxplot) +
+                  theme = theme(plot.title = element_text(size = 10)))
+p3 <- (cys_k2_prism_boxplot | dsrAB_k2_prism_boxplot) +
   plot_annotation(title = "PRISM",
-                  theme = theme(plot.title = element_text(size = 18)))
-(cys_k2_cib_boxplot | dsrAB_k2_cib_boxplot) +
+                  theme = theme(plot.title = element_text(size = 10)))
+p4 <- (cys_k2_cib_boxplot | dsrAB_k2_cib_boxplot) +
   plot_annotation(title = "Pediatric Crohn's (Lewis et. al 2015)",
-                  theme = theme(plot.title = element_text(size = 22)))
+                  theme = theme(plot.title = element_text(size = 10)))
+plot_grid(p1, p2, p3, p4, ncol = 2, axis = "bt")
+ggsave("../../figures/figure4/k2_RA_risk_populations.svg", height = 10, width = 10)
+ggsave("../../figures/figure4/k2_RA_risk_populations.png", height = 10, width = 10)
 ```
 
 ## Transcriptomic Analysis
 
 ```{r}
 source("gene_expression.R")
-baseline_boxplot | plant_boxplot | animal_boxplot
+p1 <- (baseline_boxplot_H2S | plant_boxplot_H2S | animal_boxplot_H2S) +
+  plot_annotation(title = "Expression of H2S producing genes",
+                  theme = theme(plot.title = element_text(size = 22)))
+ggsave("../../figures/supplementary/david2014_RNAseq_diet_H2S_genes.svg", height = 7, width = 10)
+ggsave("../../figures/supplementary/david2014_RNAseq_diet_H2S_genes.png", height = 7, width = 10)
+
+p2 <- (baseline_boxplot_CH4 | plant_boxplot_CH4 | animal_boxplot_CH4) +
+  plot_annotation(title = "Expression of CH4 producing genes",
+                  theme = theme(plot.title = element_text(size = 22)))
+ggsave("../../figures/supplementary/david2014_RNAseq_diet_CH4_genes.svg", height = 7, width = 10)
+ggsave("../../figures/supplementary/david2014_RNAseq_diet_CH4_genes.png", height = 7, width = 10)
+```
+
+### Presence/Absence of Cys Deg, DSR and methanogenesis
+
+```{r}
+source("H2S_CH4_presence_absence.R")
+UpSetR::upset(data = df, 
+              sets = colnames(df),
+              order.by = "freq", decreasing = TRUE,
+              mainbar.y.label = "number of samples") 
 ```
 
