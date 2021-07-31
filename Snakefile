@@ -65,6 +65,11 @@ rule process_salmon_out:
 		counts = "results/salmon_processed/{dataset}/{function}_counts.tsv"
 	shell: "python code/cluster/process_salmon_out.py {input.dataset} {function}"
 
+rule get_nreads:
+	input: "data/{dataset}/rnaseq"
+	output: "data/{dataset}/nreads.txt"
+	shell: "sbatch code/cluster/get_nreads.sh {input}"
+
 ##### =========================== BASEMENT ============================== #####
 # old workflow when only considering david 2014 data for metatranscriptomic 
 # analysis 

@@ -17,8 +17,8 @@ print('-- function name: ' + function)
 a_quant_file = glob.glob('results/salmon_out/' + dataset + '/' + function + '/*/quant.sf')[0]
 quant_file = pd.read_csv(a_quant_file, sep = '\t', header = 0)
 # quant_file = pd.read_csv('results/salmon_out/SRR5164008/quant.sf', sep = '\t', header = 0)
-tpm = pd.DataFrame(quant_file['Name'])
-counts = pd.DataFrame(quant_file['Name'])
+tpm = pd.DataFrame(quant_file[['Name', 'Length', 'EffectiveLength']])
+counts = pd.DataFrame(quant_file[['Name', 'Length', 'EffectiveLength']])
 
 print('- iterate over quant files and fill tpm and count matricies')
 # filenames = [i for i in glob.glob('results/salmon_out/*/quant.sf')]
