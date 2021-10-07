@@ -1,6 +1,6 @@
 # =========================== gene_expression.R ============================= #
 #' description: processing and plotting of gene expression data for curated
-#' cysteine degrading genes. Diamand (blastx mode) was used to map reads to 
+#' cysteine degrading genes. Diamond (blastx mode) was used to map reads to 
 #' custom database of specific genes examined in this paper.
 #' 
 #' NOTE: it is assumed that all necessary packages and data are loaded into the 
@@ -31,7 +31,6 @@ metadata <- read.csv("../../data/david-2014/SraRunTable.txt", header = TRUE)
 extra_metadata <- read.csv("../../data/from-xiaofang/cib_metadata.tsv", 
                            sep = "\t", header = TRUE)
 
-#### ==================================================================== #####
 
 #### ======================== normalizing counts ======================== #####
 
@@ -68,7 +67,6 @@ RPKM_H2S <- sweep(norm_counts_H2S, 1, H2S_aa_seq_lengths, FUN = '/')
 RPKM_CH4 <- sweep(norm_counts_CH4, 1, CH4_aa_seq_lengths, FUN = '/')
 
 
-#### ==================================================================== #####
 
 #### ======================== prep for plotting ========================= #####
 print("- prepping data for plotting")
@@ -101,7 +99,6 @@ animal_df_H2S$genes <- factor(animal_df_H2S$genes,
     levels =  c("mst", "cse", "cbs", "cyd", "metC", "cysM", "cysK",  "malY", "yhaO", "yhaM",
                 "decR", "iscS", "fn0625", "fn1055", "fn1220", "fn1419", "mgl", "tnaA", "dsrA", "dsrB"))
 
-#### ==================================================================== #####
 
 #### ========================== CH4 PRODUCTION =========================== ####
 
@@ -132,7 +129,6 @@ animal_df_CH4$genes <- factor(animal_df_CH4$genes,
                                           "Ftr", "Hmd", "Mch", "mcrA", "mcrB", "mcrG", "Mer", 
                                           "mtrA", "mtrB", "mtrC", "mtrD", "mtrE", "mtrF", "mtrG"))
 
-#### ==================================================================== #####
 
 #### ============================ plotting ============================== #####
 print("- plotting H2S plots")
@@ -193,7 +189,6 @@ animal_boxplot_H2S <- ggplot(data = animal_df_H2S, aes(x = genes, fill = genes, 
 baseline_boxplot_H2S | plant_boxplot_H2S | animal_boxplot_H2S
 ggsave("../../figures/supplementary/david2014_RNAseq_diet_H2S_genes.svg", height = 7, width = 10)
 ggsave("../../figures/supplementary/david2014_RNAseq_diet_H2S_genes.png", height = 7, width = 10)
-#### ==================================================================== #####
 
 #### ========================== plotting CH4 ============================ #####
 print("- plotting CH4 data")

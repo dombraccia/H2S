@@ -1,0 +1,92 @@
+---
+title: "Exploring putative H2S producing bacteria in IBD, CRC and healthy individuals"
+author: "Domenick J. Braccia"
+date: "7/19/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading Libraries
+
+```{r message=FALSE, warning=FALSE}
+library(curatedMetagenomicData)
+library(tictoc)
+library(dplyr)
+library(ggplot2)
+library(VennDiagram)
+library(UpSetR)
+library(patchwork)
+library(cowplot)
+library(svglite)
+library(scales)
+library(reshape2)
+library(seqinr)
+library(ggforce)
+```
+
+## Loading and Processing Data
+
+```{r}
+setwd("/Users/dome/Desktop/UMD/hall-pop-lab/H2S/")
+source("code/local/process_data_hmm.R")
+```
+
+## Load GutFunFind results
+
+```{r}
+setwd("/Users/dome/Desktop/UMD/hall-pop-lab/H2S/")
+source("code/local/gene_hits_table_hmm.R")
+cys_genes
+```
+
+## Comparing putative RA of putative cysteine degrading bacteria and srb
+
+```{r}
+setwd("/Users/dome/Desktop/UMD/hall-pop-lab/H2S/")
+source("code/local/healthy_relative_abundances_hmm.R")
+cys_met_dsr_healthy_RA
+```
+
+## In at risk groups (IBD, CRC)
+
+*** = pval < 1e-6
+** = pval < 0.0001
+* = pval < 0.01
+
+```{r, message=FALSE, warning=FALSE}
+source("risk_relative_abundances_hmm.R")
+
+p1 <- (primary_k2_boxplot | secondary_k2_boxplot | erroneous_k2_boxplot | dsrAB_k2_boxplot) +
+  plot_annotation(title = "curatedMetagneomicData (52 studies)",
+                  theme = theme(plot.title = element_text(size = 12)))
+
+p2 <- (primary_k2_hmp2_boxplot | secondary_k2_hmp2_boxplot | erroneous_k2_hmp2_boxplot | dsrAB_k2_hmp2_boxplot) +
+  plot_annotation(title = "HMP2",
+                  theme = theme(plot.title = element_text(size = 12)))
+
+p3 <- (primary_k2_prism_boxplot | secondary_k2_prism_boxplot | erroneous_k2_prism_boxplot | dsrAB_k2_prism_boxplot) +
+  plot_annotation(title = "PRISM",
+                  theme = theme(plot.title = element_text(size = 12)))
+
+p4 <- (primary_k2_cib_boxplot | secondary_k2_cib_boxplot | erroneous_k2_cib_boxplot | dsrAB_k2_cib_boxplot) +
+  plot_annotation(title = "Pediatric Crohn's (Lewis et. al 2015)",
+                  theme = theme(plot.title = element_text(size = 12)))
+
+
+##### =================================================================== #####
+
+plot_grid(p1, p2, p3, p4, ncol = 1, labels = "AUTO", axis = "tlbr")
+ggsave("../../figures/figure3/k2_RA_risk_populations.svg", height = 11, width = 8.5)
+ggsave("../../figures/figure3/k2_RA_risk_populations.png", height = 11, width = 8.5)
+```
+
+## Metatranscriptomic analysis
+
+```{r}
+setwd("/Users/dome/Desktop/UMD/hall-pop-lab/H2S")
+source("code/local/metatranscriptomic_visualization.R")
+```
+

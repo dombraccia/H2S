@@ -74,16 +74,16 @@ print("- prepping dataframes for plotting")
 ##### =================================================================== #####
 
 ### cMD
-hmp2_study_cond <- as.character(kraken_risk_pData$study_condition)
-names(hmp2_study_cond) <- rownames(kraken_risk_pData)
+cMD_study_cond <- as.character(kraken_risk_pData$study_condition)
+names(cMD_study_cond) <- rownames(kraken_risk_pData)
 
-cys_k2_df <- as.data.frame(cbind(cys_k2_cs_risk, hmp2_study_cond = hmp2_study_cond[names(cys_k2_cs_risk)]))
+cys_k2_df <- as.data.frame(cbind(cys_k2_cs_risk, cMD_study_cond = cMD_study_cond[names(cys_k2_cs_risk)]))
 colnames(cys_k2_df) <- c("RA", "population")
 cys_k2_df$RA <- as.numeric(cys_k2_df$RA)
 cys_k2_df$func <- rep("cysteine", length(cys_k2_cs_risk))
 cys_k2_df$population <- factor(cys_k2_df$population, levels = c("control", "IBD", "adenoma", "CRC"))
 
-dsrAB_k2_df <- as.data.frame(cbind(dsrAB_k2_cs_risk, hmp2_study_cond = hmp2_study_cond[names(dsrAB_k2_cs_risk)]))
+dsrAB_k2_df <- as.data.frame(cbind(dsrAB_k2_cs_risk, cMD_study_cond = cMD_study_cond[names(dsrAB_k2_cs_risk)]))
 colnames(dsrAB_k2_df) <- c("RA", "population")
 dsrAB_k2_df$RA <- as.numeric(dsrAB_k2_df$RA)
 dsrAB_k2_df$func <- rep("dsrAB", length(dsrAB_k2_cs_risk))
