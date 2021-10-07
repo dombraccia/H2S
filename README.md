@@ -1,6 +1,6 @@
 # A multiomic apprach to characterizing H2S production by the human gut microbiome
 
-This is the code repository for the manuscript "The capacity to produce hydrogen sulfide (H2S) via cysteine degradation is ubiquitous in the human gut microbiome" available at [Frontiers](https://www.frontiersin.org/articles/10.3389/fmicb.2021.705583/abstract).
+This is the code repository for the manuscript "The capacity to produce hydrogen sulfide (H2S) via cysteine degradation is ubiquitous in the human gut microbiome" published by [Frontiers in Microbiology: Microbial Physiology and Metabolism](https://www.frontiersin.org/articles/10.3389/fmicb.2021.705583/abstract).
 
 In this projcet, we searched [thousands of bacterial reference genomes](https://www.nature.com/articles/s41587-020-0603-3) for genes capable of hydrogen suflide (H2S) production via cysteine degradation. This required creating a custom, multifacted computational workflow which we have visualized here (Supplementary Figure 1 from the manuscript):
   
