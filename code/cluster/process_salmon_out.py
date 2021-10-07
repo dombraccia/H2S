@@ -12,7 +12,7 @@ description
 print('- initialize tpm and raw count matricies')
 dataset = sys.argv[1].split('/')[1]
 print('-- dataset name: ' + dataset)
-function = sys.argv[2]
+function = sys.argv[2].split('/')[2].split('_')[0]
 print('-- function name: ' + function)
 a_quant_file = glob.glob('results/salmon_out/' + dataset + '/' + function + '/*/quant.sf')[0]
 quant_file = pd.read_csv(a_quant_file, sep = '\t', header = 0)
